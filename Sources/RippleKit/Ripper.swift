@@ -29,6 +29,9 @@ public struct RipRequest: Sendable {
     /// Read every sector until two reads agree. Slower, and catches discs that return wrong data without an error.
     public var verify: Bool
     public var maxRetries: Int
+    /// Sectors per read. Nil picks 300 with Check for Errors on and 26 with it off. Each checked read is followed by a
+    /// long seek that clears the drive's cache, so small reads made a checked rip 6 times slower (measured on a real disc).
+    public var chunkSectors: Int?
     /// Tracks to rip again: track index -> the file to replace once the new one is finished.
     public var replacing: [Int: URL]
     /// JPEG or PNG bytes for the cover, written into every file.
@@ -41,11 +44,12 @@ public struct RipRequest: Sendable {
 
     public init(disc: any AudioDisc, tracks: [RipTrack], albumArtist: String, album: String,
                 folder: URL, quality: MP3Encoder.Quality = .vbr(2), format: RipFormat = .mp3,
-                year: String = "", cover: Data? = nil, verify: Bool = true, maxRetries: Int = 3,
+                year: String = "", cover: Data? = nil, verify: Bool = true, maxRetries: Int = 3, chunkSectors: Int? = nil,
                 replacing: [Int: URL] = [:],
                 discNumber: Int = 1, discCount: Int = 1, isCompilation: Bool = false) {
         self.verify = verify
         self.maxRetries = maxRetries
+        self.chunkSectors = chunkSectors
         self.replacing = replacing
         self.format = format
         self.year = year
@@ -139,7 +143,7 @@ public enum Ripper {
         var position = sectors.lowerBound
         while position < sectors.upperBound {
             if Task.isCancelled { throw CancellationError() }
-            let count = min(chunkSectors, sectors.upperBound - position)
+            let count = min(request.chunkSectors ?? (request.verify ? 300 : 26), sectors.upperBound - position)
             try writer.write(try reader.read(start: position, count: count))
             position += count
             onEvent(.progress(track: index, fraction: Double(position - sectors.lowerBound) / Double(max(1, sectors.count))))

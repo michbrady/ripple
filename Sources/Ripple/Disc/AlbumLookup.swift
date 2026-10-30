@@ -26,7 +26,8 @@ nonisolated struct LiveLookup: AlbumLookup {
 /// Made-up albums for the fixture disc, self-test, and snapshots. Never touches the network.
 nonisolated struct FixtureLookup: AlbumLookup {
     /// `single` finds exactly one exact match, the case that starts a rip on its own.
-    enum Mode: Sendable { case found, single, none, offline }
+    /// `loose` finds no exact match, but one album whose track lengths fit. `guesses` finds only poor fits.
+    enum Mode: Sendable { case found, single, loose, guesses, none, offline }
     struct Offline: Error {}
 
     var mode: Mode = .found
@@ -46,16 +47,33 @@ nonisolated struct FixtureLookup: AlbumLookup {
         ]
     }
 
+    /// Albums that MusicBrainz offered for a disc it does not know: every one a poor fit.
+    static func guesses(trackCount: Int) -> [AlbumMatch] {
+        let tracks = (1...max(1, trackCount)).map { AlbumMatch.Track(number: $0, title: titles[($0 - 1) % titles.count], artist: "Various") }
+        return [
+            AlbumMatch(id: "guess-1", title: "Sine Wave Soundtrack", artist: "Studio Orchestra", year: "2019", country: "DE",
+                       tracks: tracks, isExactDiscMatch: false, lengthFit: .init(average: 34.4, worst: 109)),
+            AlbumMatch(id: "guess-2", title: "Tone Collection", artist: "Various Artists", year: "2006", country: "BE",
+                       tracks: tracks, isExactDiscMatch: false, lengthFit: .init(average: 37.6, worst: 112)),
+        ]
+    }
+
     func matches(for toc: DiscTOC) async throws -> [AlbumMatch] {
         switch mode {
-        case .found: Self.albums(trackCount: toc.audioTracks.count)
-        case .single: Array(Self.albums(trackCount: toc.audioTracks.count).prefix(1))
-        case .none: []
+        case .loose:
+            var best = Self.albums(trackCount: toc.audioTracks.count)[0]
+            best.isExactDiscMatch = false
+            best.lengthFit = .init(average: 0.1, worst: 0.9)
+            return [best] + Self.guesses(trackCount: toc.audioTracks.count)
+        case .guesses: return Self.guesses(trackCount: toc.audioTracks.count)
+        case .found: return Self.albums(trackCount: toc.audioTracks.count)
+        case .single: return Array(Self.albums(trackCount: toc.audioTracks.count).prefix(1))
+        case .none: return []
         case .offline: throw Offline()
         }
     }
 
-    func cover(for match: AlbumMatch) async -> Data? { mode == .found || mode == .single ? Self.coverPNG() : nil }
+    func cover(for match: AlbumMatch) async -> Data? { [.found, .single, .loose].contains(mode) ? Self.coverPNG() : nil }
 
     /// A plain teal square, as PNG bytes.
     static func coverPNG() -> Data {

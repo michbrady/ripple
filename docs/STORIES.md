@@ -35,8 +35,8 @@ UX:
 - States: loading "Reading Disc…" with an indeterminate bar when the read takes over half a second; error "Ripple cannot read this disc." with "Try Again" and "Eject"; empty returns on eject
 - Words: "Reading Disc…", "Eject", "Try Again"; tooltip on the Eject icon "Eject the disc (⌘E)"
 - Access: Eject has a label and Command-E; focus moves to the track list when it appears
-Status: doing
-Note: Code is in (DiskArbitration monitor, mount refusal, eject). Not yet tried on a real drive: needs a USB optical drive. Insert a disc with Music running and confirm Music stays closed.
+Status: done
+Note: Checked on a real disc (2026-10-30): the app saw the inserted CD and showed its tracks by itself. The mount refusal (so Music stays closed) and eject are still unchecked: Music was running and the disc was already mounted.
 
 ### S-003 Read the table of contents
 As the user, I see every track with its length, named "Track 01", "Track 02".
@@ -53,8 +53,8 @@ UX:
 - States: loaded list; too much: long titles truncate with the full title in a tooltip, and 99 tracks still scroll smoothly; before lookup the rows read "Track 01"
 - Words: column headers "#", "Title", "Artist", "Length"; header placeholder "Unknown Album" and "Unknown Artist"
 - Access: arrow keys move between rows; VoiceOver reads "Track 3, Title, 3 minutes 41 seconds, included"
-Status: doing
-Note: [unit] and [snap] pass, including the MusicBrainz example TOCs. The disc ID is checked against an independent Python implementation of the published algorithm, not a published value. Still to do: [manual] compare track count and lengths on a real disc.
+Status: done
+Note: Checked on a real disc: a 32-track CD-Extra (a data session after the audio). Track starts and lead-out equal drutil's exactly, and the MusicBrainz layout rule for a data session was applied (lead-out 268,720). MusicBrainz has no exact record for it, so the lookup was a loose search; see the fix log.
 
 ### S-004 Read raw audio from a track
 As the user, I rip a track and the audio is the same as the disc.
@@ -63,8 +63,8 @@ Acceptance:
 - [self] Reading one track from the fixture yields the exact byte count (sectors times 2352).
 - [manual] On a real disc, a ripped track plays with no clicks and its length matches the disc.
 - [self] Reading the same sector twice returns fresh data, not cached data.
-Status: doing
-Note: Raw reads go through /dev/rdiskN with DKIOCCDREAD (Sources/CDShim). The fixture passes the byte-count check. Still to do on a real disc: confirm audio plays clean, and that reading a sector twice returns fresh data.
+Status: done
+Note: Checked on a real disc: raw reads return exactly sectors x 2352 bytes and match the system's own copy of the audio byte for byte (300 sectors, 7 positioned reads, 40 scattered reads, 6 cold starts). A real 105 s track ripped to a 105.23 s MP3, equal to the disc's length. One earlier run showed 18 differing sectors at the start of a read; it could not be reproduced and is recorded as unexplained. Two reads that agree do not prove the data is right if the drive repeats the same wrong bytes; AccurateRip is in Later.
 
 ### S-005 Rip a disc to MP3
 As the user, I press Rip and every checked track becomes an MP3 file.
@@ -271,7 +271,7 @@ Acceptance:
 - [self] A fixture that fails twice then succeeds gives a clean track.
 - [self] Reading a sector range twice and comparing catches a mismatch.
 Status: done
-Note: Checked on a fixture disc that fails, fails then recovers, or returns wrong data without an error. Not yet tried on a real scratched disc: whether the 2,000-sector hop really clears a drive's cache is unproven. The Check for Errors setting turns the repeat reads off.
+Note: Also checked on a real disc for speed: Check for Errors costs about 2x with 300-sector reads (4.1x real time against 9.5x). Not tried on a scratched disc.
 
 ### S-021 Flag tracks that may have errors
 As the user, I see which tracks need attention and can retry them.

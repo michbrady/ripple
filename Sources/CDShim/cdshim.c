@@ -29,3 +29,14 @@ int64_t cdshim_read_sectors(int fd, uint32_t lba, uint32_t count, void *buf) {
     if (ioctl(fd, DKIOCCDREAD, &request) < 0) return -1;
     return request.bufferLength;
 }
+
+int cdshim_get_speed(int fd) {
+    uint16_t speed = 0;
+    if (ioctl(fd, DKIOCCDGETSPEED, &speed) < 0) return -1;
+    return speed;
+}
+
+int cdshim_set_speed(int fd, uint16_t speed) {
+    if (ioctl(fd, DKIOCCDSETSPEED, &speed) < 0) return -1;
+    return 0;
+}

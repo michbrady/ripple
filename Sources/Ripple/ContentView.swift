@@ -119,7 +119,7 @@ struct AlbumHeader: View {
                 lookupStatus
             }
             Spacer()
-            if model.matches.count > 1 {
+            if model.matches.count > 1 || model.lookupState == .possible {
                 Button("Choose Album…") { model.isPickingMatch = true }
                     .disabled(model.isRipping)
                     .help("Pick another album that matches this disc")
@@ -145,11 +145,19 @@ struct AlbumHeader: View {
                 Text("Looking up album…")
             }
             .font(.callout).foregroundStyle(.secondary)
+        case .possible:
+            Text("No exact match for this disc. \(model.matches.count) possible \(model.matches.count == 1 ? "album" : "albums"): choose one, or enter the details yourself.")
+                .font(.callout).foregroundStyle(Surface.warning)
         case .notFound:
             Text("No match found. Enter the details yourself.").font(.callout).foregroundStyle(.secondary)
         case .offline:
             Text("Unable to look up this disc. Enter the details yourself.").font(.callout).foregroundStyle(.secondary)
-        case .idle, .found:
+        case .found:
+            if model.matchConfidence == .byLength {
+                Text("Not an exact disc match. Every track length fits, so this is almost certainly the album.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        case .idle:
             EmptyView()
         }
     }

@@ -22,6 +22,12 @@ nonisolated final class DeviceDisc: AudioDisc, @unchecked Sendable {
         }
         self.fd = fd
         self.toc = toc
+        // A drive often defaults to a slow, quiet speed. Ask for its fastest; errors on the next read are caught by SectorReader.
+        let before = cdshim_get_speed(fd)
+        let asked = cdshim_set_speed(fd, 0xFFFF)
+        if ProcessInfo.processInfo.environment["RIPPLE_DRIVE_DEBUG"] == "1" {
+            FileHandle.standardError.write(Data("DRIVE speed before: \(before) KB/s, set max: \(asked == 0 ? "ok" : "refused (errno \(errno))"), now: \(cdshim_get_speed(fd)) KB/s\n".utf8))
+        }
     }
 
     deinit { close(fd) }

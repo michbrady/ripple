@@ -2,6 +2,24 @@
 
 Bugs found while building, newest first. Each ends with a rule.
 
+## A loose MusicBrainz match was filled in as if it were the album, and the right album ranked last (M5, found on the first real music CD)
+Symptom: The disc "Songs for Silly Time" (Twin Sisters) was shown as "GrandMix Nouveau Disco" by Ben Liebrand, with wrong titles.
+Cause: MusicBrainz had no record of this disc's exact ID, so the lookup fell back to a loose search by table of contents and returned six albums, all with 32 tracks. Ripple took the first as the answer without saying so. It ranked them by format and year, and the right album (no format, no year) came last.
+Fix: Rank loose matches by how closely each track's length fits the disc (the right album: 0.03 s average off; the other five: 34 to 42 s off). A loose match is filled in only if every length fits (average under 1 s, worst under 3 s), and the window says it is not an exact disc match. Otherwise nothing is filled in and the user chooses ("No exact match for this disc. 6 possible albums").
+Rule: Never present a guess as the answer. Say how sure you are, and rank by evidence (here, track lengths), not by tidy metadata.
+
+## Checked rips were 6 times slower than needed (M4)
+Symptom: A 105-second track took 67.6 s with Check for Errors on (1.6x real time), but 11 s with it off (9.5x).
+Cause: Each 26-sector read was followed by a seek across the disc to clear the drive's cache.
+Fix: Checked rips read 300 sectors at a time: 25.4 s (4.1x).
+Rule: Measure on the real device before tuning. A cost per call, multiplied by a small chunk size, was the whole problem.
+
+## My real-disc comparison called good audio bad (M5)
+Symptom: The raw audio from the disc did not match the system's own copy, byte for byte.
+Cause: The system's files are AIFC with compression type "sowt", which is already little-endian. My test swapped the bytes as if it were classic big-endian AIFF.
+Fix: Read the compression type and swap only when needed. The audio then matched exactly: 300 sectors, 7 positioned reads, 40 scattered reads (12,000 sectors), and 6 cold starts.
+Rule: Read a file's declared format before assuming it. One earlier run showed 18 differing sectors at the start of a read and could not be reproduced afterwards; it is recorded as unexplained, not fixed.
+
 ## MP3 Disc files were numbered twice: `01 - 01 - One.mp3` (M5, found by the first real burn)
 Symptom: On the burned DVD-R every file name had the number twice.
 Cause: The burner added "NN - " to each name, but ripped files already start with a number.

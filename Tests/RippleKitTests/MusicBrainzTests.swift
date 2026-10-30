@@ -198,3 +198,71 @@ import Testing
         #expect(cover.prefix(2) == Data([0xFF, 0xD8]), "expected a JPEG")
     }
 }
+
+/// The real answer MusicBrainz gave for a real 32-track disc it has no exact record of. The correct album was
+/// in the list, but ranked last by format and year. Track lengths tell it apart.
+@Suite struct LooseMatchTests {
+    static func fixture(_ name: String, _ ext: String) throws -> Data {
+        let url = try #require(Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "Fixtures"))
+        return try Data(contentsOf: url)
+    }
+
+    /// The disc's audio track lengths, from its table of contents as `drutil` printed it.
+    static func discSeconds() throws -> (id: String, seconds: [Double]) {
+        let numbers = String(decoding: try fixture("silly-time-toc", "txt"), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines).split(separator: "+").compactMap { Int($0) }
+        let leadOut = numbers[2]
+        let starts = Array(numbers[3...])
+        let ends = Array(starts.dropFirst()) + [leadOut]
+        return ("lonjyA8RoRLGISXqZJVQDxNfk3M-", zip(starts, ends).map { Double($1 - $0) / 75.0 })
+    }
+
+    @Test func theRightAlbumRanksFirstByTrackLengths() throws {
+        let disc = try Self.discSeconds()
+        #expect(disc.seconds.count == 32)
+        let matches = try MusicBrainz.parse(Self.fixture("musicbrainz-fuzzy-silly-time", "json"), discID: disc.id,
+                                            trackCount: 32, trackSeconds: disc.seconds)
+        #expect(matches.count == 6)
+        let best = try #require(matches.first)
+        #expect(best.title == "Songs for Silly Time")
+        #expect(best.artist == "Twin Sisters")
+        #expect(!best.isExactDiscMatch)
+        let fit = try #require(best.lengthFit)
+        #expect(fit.average < 0.1 && fit.worst < 1.5, "average \(fit.average) s, worst \(fit.worst) s")
+        #expect(best.confidence == .byLength)
+        #expect(best.detail.hasSuffix("track lengths match"))
+    }
+
+    @Test func theOtherFiveAreOnlyGuesses() throws {
+        let disc = try Self.discSeconds()
+        let matches = try MusicBrainz.parse(Self.fixture("musicbrainz-fuzzy-silly-time", "json"), discID: disc.id,
+                                            trackCount: 32, trackSeconds: disc.seconds)
+        for guess in matches.dropFirst() {
+            #expect(guess.confidence == .guess, "\(guess.title) fits by \(guess.lengthFit?.average ?? -1) s")
+            #expect((guess.lengthFit?.average ?? 0) > 20)
+            #expect(guess.detail.contains("lengths off by about"))
+        }
+    }
+
+    @Test func withoutTrackLengthsTheOldOrderStillApplies() throws {
+        let matches = try MusicBrainz.parse(Self.fixture("musicbrainz-fuzzy-silly-time", "json"), discID: "x", trackCount: 32)
+        #expect(matches.allSatisfy { $0.lengthFit == nil && $0.confidence == .guess })
+        #expect(matches.last?.title == "Songs for Silly Time", "no lengths to go on, so the album with no year or format sorts last")
+    }
+
+    @Test func anExactMatchIsAlwaysExactEvenWithoutLengths() throws {
+        let exact = AlbumMatch(id: "e", title: "T", artist: "A", isExactDiscMatch: true)
+        #expect(exact.confidence == .exact)
+        let close = AlbumMatch(id: "c", title: "T", artist: "A", isExactDiscMatch: false, lengthFit: .init(average: 0.4, worst: 2.0))
+        let far = AlbumMatch(id: "f", title: "T", artist: "A", isExactDiscMatch: false, lengthFit: .init(average: 0.4, worst: 9.0))
+        #expect(close.confidence == .byLength)
+        #expect(far.confidence == .guess, "one track far off is not a match")
+    }
+
+    @Test func theDiscSetsLengthComesFromTheTableOfContents() throws {
+        let offsets = [0, 15213, 32164, 46442, 63264, 80339]
+        let toc = DiscTOC(entries: offsets.enumerated().map { .init(number: $0.offset + 1, lba: $0.element) }, leadOut: 95312)
+        #expect(toc.audioTrackSeconds.count == 6)
+        #expect(abs(toc.audioTrackSeconds[0] - 15213.0 / 75.0) < 0.001)
+    }
+}

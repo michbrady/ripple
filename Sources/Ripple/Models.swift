@@ -5,12 +5,14 @@ import RippleKit
 
 /// The pages snapshot mode visits.
 enum SnapshotPage: String, CaseIterable {
-    case empty, tracks, unmatched, picker, ripping, done, attention, unreadable, folderProblem
+    case empty, tracks, unmatched, picker, ripping, done, attention, unreadable, folderProblem, possible
 }
 
 /// How the album lookup went.
 enum LookupState: Equatable {
     case idle, searching, found, notFound, offline
+    /// Albums were found, but none is certain. Nothing is filled in until the user chooses.
+    case possible
 }
 
 /// App-wide state that menus, toolbars, and views share.
@@ -120,6 +122,11 @@ final class AppModel: StoppableJob {
     }
 
     var isCompilation: Bool { album.isCompilation }
+
+    /// How sure the filled-in album is, for the note under the album name. Nil before anything is filled in.
+    var matchConfidence: AlbumMatch.Confidence? {
+        matches.first { $0.id == album.selectedMatchID }?.confidence
+    }
     var rows: [TrackRow] {
         get { album.tracks }
         set { album.tracks = newValue }
@@ -264,6 +271,11 @@ final class AppModel: StoppableJob {
                 matches = found
                 guard let best = found.first else {
                     lookupState = .notFound
+                    return
+                }
+                // A loose guess is never filled in on its own: the user picks from the list.
+                if best.confidence == .guess {
+                    lookupState = .possible
                     return
                 }
                 lookupState = .found
@@ -480,6 +492,14 @@ final class AppModel: StoppableJob {
             lookupState = .notFound
             return
         }
+        if page == .possible {
+            album.clearDetails()
+            matches = FixtureLookup.guesses(trackCount: rows.count)
+            setCoverData(nil)
+            customCover = false
+            lookupState = .possible
+            return
+        }
         matches = FixtureLookup.albums(trackCount: rows.count)
         lookupState = .found
         apply(matches[0])
@@ -487,6 +507,8 @@ final class AppModel: StoppableJob {
         switch page {
         case .picker:
             isPickingMatch = true
+        case .possible:
+            break
         case .ripping:
             for index in rows.indices {
                 rows[index].status = index < 3 ? .done : index == 3 ? .ripping(0.4) : .waiting

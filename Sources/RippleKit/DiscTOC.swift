@@ -70,6 +70,11 @@ public struct DiscTOC: Equatable, Sendable {
         return start..<max(start, end)
     }
 
+    /// The length of every audio track, in order.
+    public var audioTrackSeconds: [Double] {
+        entries.indices.filter { entries[$0].isAudio }.map { seconds(ofTrack: $0) }
+    }
+
     public func seconds(ofTrack index: Int) -> Double {
         Double(sectors(ofTrack: index).count) / Double(Self.sectorsPerSecond)
     }

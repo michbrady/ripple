@@ -6,12 +6,36 @@ public struct AlbumMatch: Equatable, Sendable, Identifiable {
         public var number: Int
         public var title: String
         public var artist: String
+        /// From MusicBrainz, when it knows the recording's length.
+        public var seconds: Double?
 
-        public init(number: Int, title: String, artist: String) {
+        public init(number: Int, title: String, artist: String, seconds: Double? = nil) {
             self.number = number
             self.title = title
             self.artist = artist
+            self.seconds = seconds
         }
+    }
+
+    /// How closely a release's track lengths fit the disc, in seconds.
+    public struct LengthFit: Equatable, Sendable {
+        public var average: Double
+        public var worst: Double
+
+        public init(average: Double, worst: Double) {
+            self.average = average
+            self.worst = worst
+        }
+    }
+
+    /// How sure we are that this is the disc's album.
+    public enum Confidence: Equatable, Sendable {
+        /// MusicBrainz lists this exact disc ID on the release.
+        case exact
+        /// Not listed, but every track length fits within a second or so: almost certainly the same album.
+        case byLength
+        /// A loose guess. Never filled in without asking.
+        case guess
     }
 
     /// The MusicBrainz release id.
@@ -27,10 +51,13 @@ public struct AlbumMatch: Equatable, Sendable, Identifiable {
     public var tracks: [Track]
     /// True when MusicBrainz lists this exact disc ID on the release, false for a fuzzy match.
     public var isExactDiscMatch: Bool
+    /// Nil when the lengths are not known or the track counts differ.
+    public var lengthFit: LengthFit?
 
     public init(id: String, title: String, artist: String, year: String = "", country: String = "",
                 format: String = "CD", discCount: Int = 1, discNumber: Int = 1,
-                tracks: [Track] = [], isExactDiscMatch: Bool = true) {
+                tracks: [Track] = [], isExactDiscMatch: Bool = true, lengthFit: LengthFit? = nil) {
+        self.lengthFit = lengthFit
         self.id = id
         self.title = title
         self.artist = artist
@@ -45,12 +72,23 @@ public struct AlbumMatch: Equatable, Sendable, Identifiable {
 
     public var isCompilation: Bool { artist == "Various Artists" }
 
+    public var confidence: Confidence {
+        if isExactDiscMatch { return .exact }
+        if let fit = lengthFit, fit.average < 1.0, fit.worst < 3.0 { return .byLength }
+        return .guess
+    }
+
     /// The front cover from the Cover Art Archive. It answers 404 when there is none.
     public var coverURL: URL { URL(string: "https://coverartarchive.org/release/\(id)/front-500")! }
 
-    /// "2004 · SK · CD · 6 tracks"
+    /// "2004 · SK · CD · 6 tracks", plus how well the lengths fit when the disc ID did not match.
     public var detail: String {
-        [year, country, format, "\(tracks.count) tracks"].filter { !$0.isEmpty }.joined(separator: " · ")
+        var parts = [year, country, format, "\(tracks.count) tracks"].filter { !$0.isEmpty }
+        if !isExactDiscMatch, let fit = lengthFit {
+            parts.append(fit.average < 1.0 && fit.worst < 3.0 ? "track lengths match"
+                         : "lengths off by about \(Int(fit.average.rounded())) s per track")
+        }
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -70,16 +108,21 @@ public enum MusicBrainz {
     }
 
     /// Reads a disc ID lookup response into matches, best first.
-    public static func parse(_ data: Data, discID: String, trackCount: Int) throws -> [AlbumMatch] {
+    /// `trackSeconds` are the disc's audio track lengths. With them, a release whose lengths fit the disc is
+    /// ranked above one that does not.
+    public static func parse(_ data: Data, discID: String, trackCount: Int, trackSeconds: [Double] = []) throws -> [AlbumMatch] {
         let response = try JSONDecoder().decode(Response.self, from: data)
-        let matches = (response.releases ?? []).compactMap { $0.match(discID: discID, trackCount: trackCount) }
+        let matches = (response.releases ?? []).compactMap {
+            $0.match(discID: discID, trackCount: trackCount, trackSeconds: trackSeconds)
+        }
         return matches.sorted { rank($0) < rank($1) }
     }
 
-    /// Exact disc ID first, then CDs, then the earliest year.
+    /// Exact disc ID first. Then the closest track lengths. Then CDs, then the earliest year.
     private static func rank(_ match: AlbumMatch) -> String {
-        [match.isExactDiscMatch ? "0" : "1", match.format == "CD" ? "0" : "1",
-         match.year.isEmpty ? "9999" : match.year, match.title].joined(separator: "|")
+        let fit = match.lengthFit.map { String(format: "%09.3f", $0.average) } ?? "999999.999"
+        return [match.isExactDiscMatch ? "0" : "1", fit, match.format == "CD" ? "0" : "1",
+                match.year.isEmpty ? "9999" : match.year, match.title].joined(separator: "|")
     }
 
     // MARK: Response shape
@@ -104,20 +147,45 @@ public enum MusicBrainz {
             case artistCredit = "artist-credit"
         }
 
-        func match(discID: String, trackCount: Int) -> AlbumMatch? {
+        func match(discID: String, trackCount: Int, trackSeconds: [Double]) -> AlbumMatch? {
             let media = media ?? []
             let exact = media.firstIndex { $0.discs?.contains { $0.id == discID } == true }
-            guard let index = exact ?? media.firstIndex(where: { $0.tracks?.count == trackCount }) else { return nil }
+            // With no exact disc, take the disc of the set whose track lengths fit best.
+            let candidates = media.indices.filter { media[$0].tracks?.count == trackCount }
+            let fitted = candidates.map { ($0, Self.fit(media[$0], trackSeconds)) }
+            let bestByFit = fitted.min { ($0.1?.average ?? .infinity) < ($1.1?.average ?? .infinity) }?.0
+            guard let index = exact ?? bestByFit else { return nil }
             let medium = media[index]
             let tracks = (medium.tracks ?? []).enumerated().map { offset, track in
                 AlbumMatch.Track(number: track.position ?? offset + 1, title: track.title,
-                                 artist: Self.name(track.artistCredit ?? track.recording?.artistCredit))
+                                 artist: Self.name(track.artistCredit ?? track.recording?.artistCredit),
+                                 seconds: Self.seconds(track))
             }
             return AlbumMatch(id: id, title: title, artist: Self.name(artistCredit),
                               year: String((date ?? "").prefix(4)), country: country ?? "",
                               format: medium.format ?? "CD", discCount: max(1, media.count),
                               discNumber: medium.position ?? index + 1, tracks: tracks,
-                              isExactDiscMatch: exact != nil)
+                              isExactDiscMatch: exact != nil, lengthFit: Self.fit(medium, trackSeconds))
+        }
+
+        static func seconds(_ track: Track) -> Double? {
+            guard let ms = track.length ?? track.recording?.length, ms > 0 else { return nil }
+            return Double(ms) / 1_000
+        }
+
+        /// Average and worst difference between each track's length and the disc's. Nil if any length is unknown.
+        static func fit(_ medium: Medium, _ disc: [Double]) -> AlbumMatch.LengthFit? {
+            let tracks = medium.tracks ?? []
+            guard !disc.isEmpty, tracks.count == disc.count else { return nil }
+            var total = 0.0
+            var worst = 0.0
+            for (track, expected) in zip(tracks, disc) {
+                guard let seconds = seconds(track) else { return nil }
+                let difference = abs(seconds - expected)
+                total += difference
+                worst = max(worst, difference)
+            }
+            return AlbumMatch.LengthFit(average: total / Double(disc.count), worst: worst)
         }
 
         static func name(_ credits: [Credit]?) -> String {
@@ -137,18 +205,23 @@ public enum MusicBrainz {
     struct Track: Decodable {
         var position: Int?
         var title: String
+        var length: Int?
         var artistCredit: [Credit]?
         var recording: Recording?
 
         enum CodingKeys: String, CodingKey {
-            case position, title, recording
+            case position, title, recording, length
             case artistCredit = "artist-credit"
         }
     }
 
     struct Recording: Decodable {
+        var length: Int?
         var artistCredit: [Credit]?
-        enum CodingKeys: String, CodingKey { case artistCredit = "artist-credit" }
+        enum CodingKeys: String, CodingKey {
+            case length
+            case artistCredit = "artist-credit"
+        }
     }
 }
 
@@ -188,7 +261,8 @@ public actor MusicBrainzClient {
             let (data, status) = try await transport(request)
             switch status {
             case 200:
-                return try MusicBrainz.parse(data, discID: toc.discID, trackCount: toc.audioTracks.count)
+                return try MusicBrainz.parse(data, discID: toc.discID, trackCount: toc.audioTracks.count,
+                                             trackSeconds: toc.audioTrackSeconds)
             case 404:
                 return []
             case 503 where attempt < 2:
