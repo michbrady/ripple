@@ -294,7 +294,7 @@ Screens: 09-burn-empty
 Acceptance:
 - [snap] A toolbar switch shows Rip and Burn, and Burn shows an empty list that says to drop MP3 files here.
 - [self] The mode survives a restart.
-Status: todo
+Status: done
 
 ### S-027 Choose a folder of MP3 files to burn
 As the user, I choose a folder on my Mac, and Ripple lists the MP3 files in it. Dropping a folder or files on the window works too.
@@ -307,7 +307,8 @@ Acceptance:
 - [self] A file with no tags uses its file name as the title.
 - [self] A non-MP3 file is skipped, and a message names how many were skipped.
 - [snap] Rows show number, title, artist, and length.
-Status: todo
+Status: done
+Note: Folder and drop are tested with real MP3 files made by the ripper. Try the Choose Folder panel and a real drag by hand.
 
 ### S-028 Order and remove tracks
 As the user, I drag rows to reorder them and remove rows I do not want.
@@ -316,7 +317,8 @@ Depends: S-027
 Acceptance:
 - [self] Dragging a row changes the burn order, and the numbers update.
 - [self] Delete removes the selected rows, and Command-Z brings them back.
-Status: todo
+Status: done
+Note: Dragging rows is tested through the model (move), not with a real drag. Try it by hand.
 
 ### S-029 See how much fits on the disc
 As the user, I see total time against the blank in the drive, before I burn.
@@ -326,7 +328,7 @@ Acceptance:
 - [unit] Total length sums track lengths, and 80 minutes is the default limit.
 - [self] With a blank in the drive, the limit uses the blank's real capacity.
 - [snap] A bar shows used time and turns to a warning when over the limit, with the Burn button disabled and a message that says how many minutes to remove.
-Status: todo
+Status: done
 
 ### S-030 Detect the burner and a blank disc
 As the user, I see whether a burner and a blank disc are ready.
@@ -337,7 +339,8 @@ Acceptance:
 - [self] With a burner and no disc, the line says to insert a blank CD-R.
 - [self] With a non-blank disc, the line says it is not blank and offers erase only for rewritable discs.
 - [manual] Check each state with a real burner.
-Status: todo
+Status: done
+Note: The real burner's status was read on the connected drive (Lenovo USB burner, blank DVD-R, 2,297,888 blocks). Erase for a rewritable disc is not offered: it destroys data, so the message says to erase it in Disk Utility. Check each state with a real disc.
 
 ### S-031 Burn an audio CD
 As the user, I press Burn and get a CD that plays in any player.
@@ -349,7 +352,8 @@ Acceptance:
 - [snap] The burning page shows the stage (preparing, burning, finishing) and a progress bar.
 - [snap] The done page says the disc is ready and ejects it.
 - [manual] The disc plays all tracks in order in a CD player.
-Status: todo
+Status: doing
+Note: Logic is done against the stand-in burner. The real DiscRecording write path compiles and follows the API, but has not written a disc. Needs a blank CD-R and a person to play the result in a CD player. Do not run it on a disc you want to keep: DVD-R and CD-R are write-once.
 
 ### S-032 Cancel a burn and handle burn errors
 As the user, I can cancel before the burn starts, and I get a clear message if it fails.
@@ -359,7 +363,8 @@ Acceptance:
 - [self] Cancel during preparing leaves the disc untouched.
 - [snap] Once writing starts, Cancel is replaced by a note that stopping now ruins the disc.
 - [self] A failed burn names the cause (drive error, disc rejected) and offers Try again.
-Status: todo
+Status: done
+Note: Cancel before writing, no Cancel after, and a failed burn are checked with the stand-in. The real burner's abort path is not exercised.
 
 ### S-033 Burn the MP3 files as they are
 As the user, I choose "MP3 Disc" to copy the MP3 files onto the disc unchanged, so more music fits.
@@ -370,7 +375,8 @@ Acceptance:
 - [unit] For an MP3 Disc the capacity bar counts file sizes against the blank's megabytes, not minutes.
 - [self] The fixture burn target receives the original MP3 files byte for byte, with the folder layout kept.
 - [manual] The disc mounts on a Mac and the MP3 files play from it.
-Status: todo
+Status: doing
+Note: Logic is done against the stand-in. Files go on the disc as numbered names (01 - Title.mp3) so players that sort by name keep the list order. Needs a real MP3 Disc burn (a blank DVD-R is in the drive) and a check that it mounts and plays.
 
 ## M6 Polish
 Settings, eject, auto-start, icon.

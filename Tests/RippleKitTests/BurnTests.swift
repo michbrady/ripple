@@ -77,6 +77,17 @@ import Testing
         #expect(scan.skipped == 1)
     }
 
+    @Test func theSameFileReachedThroughALinkIsOneItem() async throws {
+        let dir = try Self.folder()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = try Self.makeMP3(dir.appending(path: "a.mp3"), tags: TrackTags(title: "A"))
+        let link = dir.appending(path: "link.mp3")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+        let direct = try #require(await BurnScanner.read(file))
+        let linked = try #require(await BurnScanner.read(link))
+        #expect(direct.id == linked.id)
+    }
+
     @Test func anEmptyFolderGivesNothing() async throws {
         let dir = try Self.folder()
         defer { try? FileManager.default.removeItem(at: dir) }

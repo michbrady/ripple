@@ -11,6 +11,7 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | Burn | Write tracks onto a blank disc | record, write |
 | Audio Disc | A burned disc that plays in any CD player (MP3s converted to disc audio) | music CD, Red Book |
 | MP3 Disc | A burned disc holding the MP3 files unchanged | data CD, MP3 CD |
+| Mode | Rip or Burn: what the window is for | tab, page |
 | Source Folder | The Mac folder whose MP3 files get burned | input folder, library |
 | Format | MP3 or M4A, the kind of file a rip makes | codec, encoder, type |
 | Quality | How much detail an MP3 keeps: variable (default) or a fixed rate | bitrate, preset |

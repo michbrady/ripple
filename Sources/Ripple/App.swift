@@ -1,4 +1,5 @@
 import AppKit
+import RippleKit
 import SwiftUI
 
 // Ripple
@@ -14,11 +15,13 @@ import SwiftUI
 struct RippleApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel()
+    @State private var burn = BurnModel(burner: Burners.make())
 
     var body: some Scene {
         Window("Ripple", id: "main") {
             ContentView()
                 .environment(model)
+                .environment(burn)
                 .themed()
                 .overlay { if GridOverlay.enabled { GridOverlay() } }
                 .frame(minWidth: 640, minHeight: 420)
@@ -30,12 +33,15 @@ struct RippleApp: App {
                 Button("About Ripple") { AboutPanel.show() }
             }
             CommandGroup(replacing: .newItem) {
-                Button("Rip Checked Tracks") { model.rip() }
+                Button("Rip Checked Tracks") { model.mode = .rip; model.rip() }
                     .keyboardShortcut("r")
-                    .disabled(model.phase != .ready || model.checkedCount == 0)
-                Button("Eject Disc") { model.eject() }
+                    .disabled(model.mode == .burn || model.phase != .ready || model.checkedCount == 0)
+                Button("Burn Disc") { burn.burn() }
+                    .keyboardShortcut("b")
+                    .disabled(model.mode == .rip || !burn.canBurn)
+                Button("Eject Disc") { model.mode == .burn ? burn.eject() : model.eject() }
                     .keyboardShortcut("e")
-                    .disabled(!model.hasDisc)
+                    .disabled(model.mode == .burn ? burn.isBusy : !model.hasDisc)
             }
             CommandGroup(after: .pasteboard) {
                 Button("Check All Tracks") { for index in model.rows.indices { model.rows[index].include = true } }
@@ -62,18 +68,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
-    /// Quitting mid-rip asks first, then lets the rip delete its half-written file.
+    /// Quitting mid-job (a rip or a burn) asks first, then lets the job clean up.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let model = AppModel.current, model.isRipping, !SelfTest.requested,
-              ProcessInfo.processInfo.environment["APP_SNAPSHOT"] == nil else { return .terminateNow }
+        guard !SelfTest.requested, ProcessInfo.processInfo.environment["APP_SNAPSHOT"] == nil,
+              let job = Jobs.busy.first else { return .terminateNow }
+        let prompt = job.stopPrompt
         let alert = NSAlert()
-        alert.messageText = "Stop Ripping?"
-        alert.informativeText = "Finished tracks are kept. The track in progress is deleted."
-        alert.addButton(withTitle: "Stop")
-        alert.addButton(withTitle: "Keep Ripping")
-        guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+        alert.messageText = prompt.title
+        alert.informativeText = prompt.detail
+        alert.addButton(withTitle: prompt.keep)
+        alert.addButton(withTitle: prompt.stop)
+        guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
         Task {
-            await model.stopRipping()
+            await job.stop()
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
@@ -113,5 +120,16 @@ enum AboutPanel {
             """, attributes: body))
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
         NSApp.activate()
+    }
+}
+
+/// Which burner the app uses: the Mac's, or a stand-in for snapshots and tests.
+enum Burners {
+    static func make() -> any DiscBurner {
+        let env = ProcessInfo.processInfo.environment
+        if env["APP_FIXTURE_DISC"] == "1" || env["APP_BURN_FIXTURE"] == "1" || Store.isOverridden {
+            return FixtureBurner(state: FixtureBurner.blankCD())
+        }
+        return DiscRecordingBurner()
     }
 }

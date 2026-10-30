@@ -4,30 +4,53 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
+    @Environment(BurnModel.self) private var burn
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         @Bindable var model = model
-        return VStack(spacing: 0) {
-            content
-            if model.hasDisc, !isFailed {
-                Divider()
-                BottomBar()
+        return Group {
+            if model.mode == .burn {
+                BurnView()
+            } else {
+                VStack(spacing: 0) {
+                    content
+                    if model.hasDisc, !isFailed {
+                        Divider()
+                        BottomBar()
+                    }
+                }
             }
         }
-        .navigationTitle(model.windowTitle)
+        .navigationTitle(model.mode == .burn ? burn.windowTitle : model.windowTitle)
         .sheet(isPresented: $model.isPickingMatch) { MatchPicker() }
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Mode", selection: $model.mode) {
+                    ForEach(AppMode.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .disabled(model.isBusy || burn.isBusy)
+                .help("Switch between ripping a disc and burning one")
+            }
             ToolbarItem {
-                Button("Eject", systemImage: "eject") { model.eject() }
-                    .help("Eject the disc (⌘E)")
-                    .disabled(!model.hasDisc && !isFailed)
+                if model.mode == .burn {
+                    Button("Eject", systemImage: "eject") { burn.eject() }
+                        .help("Eject the disc (⌘E)")
+                        .disabled(burn.isBusy || burn.deviceState == .noDisc || burn.deviceState == .noDrive)
+                } else {
+                    Button("Eject", systemImage: "eject") { model.eject() }
+                        .help("Eject the disc (⌘E)")
+                        .disabled(!model.hasDisc && !isFailed)
+                }
             }
         }
         .task {
             model.start()
-            SelfTest.runIfRequested(model: model)
-            Snapshot.runIfRequested(model: model, openSettings: openSettings)
+            burn.start()
+            SelfTest.runIfRequested(model: model, burn: burn)
+            Snapshot.runIfRequested(model: model, burn: burn, openSettings: openSettings)
         }
     }
 

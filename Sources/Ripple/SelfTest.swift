@@ -18,7 +18,7 @@ enum SelfTest {
     private static var failures = 0
     private static var count = 0
 
-    static func runIfRequested(model: AppModel) {
+    static func runIfRequested(model: AppModel, burn: BurnModel) {
         guard requested else { return }
         // Print each line at once, so a crash keeps the lines before it.
         setvbuf(stdout, nil, _IOLBF, 0)
@@ -86,10 +86,158 @@ enum SelfTest {
             await formatChecks(model: model, out: out)
             await tagChecks(model: model, out: out)
             await attentionChecks(model: model, out: out)
+            await burnChecks(burn: burn, out: out)
+            realDriveChecks()
             coverPrepChecks()
 
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
+        }
+    }
+
+    /// S-026 to S-033: burn mode, on real MP3 files and a stand-in burner.
+    private static func burnChecks(burn: BurnModel, out: URL) async {
+        let fm = FileManager.default
+        guard let burner = burn.burner as? FixtureBurner else {
+            check("the self-test uses the stand-in burner", false)
+            return
+        }
+
+        // Real MP3 files, made by the ripper: three tracks of two seconds, tagged One, Two, Three.
+        let source = out.appending(path: "burn-source", directoryHint: .isDirectory)
+        let album = FixtureDisc(trackSeconds: [2, 2, 2])
+        let request = RipRequest(disc: album, tracks: ["One", "Two", "Three"].enumerated().map { RipTrack(number: $0.offset + 1, title: $0.element, artist: "The Tones") },
+                                 albumArtist: "The Tones", album: "Mix", folder: source, quality: .vbr(6), verify: false)
+        _ = try? await Ripper.rip(request, onEvent: { _ in })
+        let folder = source.appending(path: "The Tones/Mix", directoryHint: .isDirectory)
+        try? Data("notes".utf8).write(to: folder.appending(path: "notes.txt"))
+
+        // S-026, S-027: choose a folder, and the MP3 files are listed in order.
+        burn.clear()
+        burner.set(FixtureBurner.blankCD())
+        await wait(until: { burn.deviceState == FixtureBurner.blankCD() })
+        burn.load(folder: folder)
+        await wait(until: { !burn.isScanning && !burn.items.isEmpty })
+        check("a folder of MP3 files is listed in order", burn.items.map(\.title) == ["One", "Two", "Three"], "\(burn.items.map(\.title))")
+        check("each file shows its artist and length", burn.items.allSatisfy { $0.artist == "The Tones" && abs($0.seconds - 2) < 0.2 })
+        check("a file that is not MP3 is counted as skipped", burn.skipped == 1)
+        check("the volume name is the folder name", burn.volumeName == "Mix")
+
+        // Dropping files adds them once.
+        await burn.add(dropped: [folder.appending(path: "02 - Two.mp3"), folder.appending(path: "notes.txt")])
+        check("a dropped file that is already listed is not added twice", burn.items.count == 3)
+        check("a dropped file that is not MP3 is counted as skipped", burn.skipped == 2)
+
+        // S-028: reorder, remove, undo.
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        burn.undoManager = undo
+        undo.beginUndoGrouping()
+        burn.move(from: IndexSet(integer: 2), to: 0)
+        undo.endUndoGrouping()
+        check("dragging a row changes the burn order", burn.items.map(\.title) == ["Three", "One", "Two"], "\(burn.items.map(\.title))")
+        undo.beginUndoGrouping()
+        burn.remove(ids: [burn.items[1].id])
+        undo.endUndoGrouping()
+        check("Delete removes the selected file", burn.items.map(\.title) == ["Three", "Two"])
+        undo.undo()
+        check("Undo brings the removed file back", burn.items.map(\.title) == ["Three", "One", "Two"], "\(burn.items.map(\.title))")
+        undo.undo()
+        check("Undo brings back the old order", burn.items.map(\.title) == ["One", "Two", "Three"])
+
+        // S-029: capacity.
+        burn.type = .audio
+        burner.set(FixtureBurner.blankCD(blocks: 10_000))
+        await wait(until: { burn.deviceState == FixtureBurner.blankCD(blocks: 10_000) })
+        check("three 2-second files fit on a small blank", burn.fit == .fits && burn.canBurn)
+        burner.set(FixtureBurner.blankCD(blocks: 500))
+        await wait(until: { burn.deviceState == FixtureBurner.blankCD(blocks: 500) })
+        var isOver = false
+        if case .over = burn.fit { isOver = true }
+        check("files that do not fit say so and block the Burn button", isOver && !burn.canBurn && burn.fitMessage?.hasPrefix("Remove ") == true, "\(burn.fitMessage ?? "nil")")
+        burner.set(FixtureBurner.blankDVD())
+        await wait(until: { burn.deviceState == FixtureBurner.blankDVD() })
+        check("an Audio Disc does not go on a DVD", !burn.canBurn && burn.fitMessage == "An Audio Disc needs a blank CD-R. This disc is a DVD-R.", "\(burn.fitMessage ?? "nil")")
+        burn.type = .data
+        check("an MP3 Disc does go on a DVD", burn.canBurn)
+        burn.type = .audio
+
+        // S-030: the drive and the disc.
+        for (state, words) in [(BurnDeviceState.noDrive, "Connect a USB burner"), (.noDisc, "Insert a blank CD-R."),
+                               (.notBlank(label: "CD-RW", rewritable: true), "Erase it in Disk Utility"),
+                               (.notBlank(label: "CD-R", rewritable: false), "Insert a blank disc.")] {
+            burner.set(state)
+            await wait(until: { burn.deviceState == state })
+            check("the drive line for \(state) says what to do", burn.deviceLine.contains(words) && !burn.canBurn, burn.deviceLine)
+        }
+
+        // S-031: burn an Audio Disc. The files go to the burner in list order.
+        burner.set(FixtureBurner.blankCD())
+        await wait(until: { burn.canBurn })
+        burn.burn()
+        check("Burn starts burning", burn.isBurning)
+        await wait(until: { burn.phase == .done })
+        check("the burn finishes", burn.phase == .done)
+        let job = burner.jobs.last
+        check("an Audio Disc job carries the files in list order", job?.type == .audio && job?.files == burn.items.map(\.url))
+        check("the job names the volume", job?.volumeName == "Mix")
+
+        // S-033: burn an MP3 Disc on a DVD.
+        burn.tryAgain()
+        burn.type = .data
+        burner.set(FixtureBurner.blankDVD())
+        await wait(until: { burn.canBurn })
+        burn.burn()
+        await wait(until: { burn.phase == .done })
+        check("an MP3 Disc job is marked as data", burner.jobs.last?.type == .data && burner.jobs.count == 2)
+        burn.tryAgain()
+        burn.type = .audio
+
+        // S-032: cancel before writing, no cancel after, and a failed burn.
+        burner.set(FixtureBurner.blankCD())
+        await wait(until: { burn.canBurn })
+        burner.stepDelay = .milliseconds(300)
+        let before = burner.jobs.count
+        burn.burn()
+        await wait(until: { burn.phase == .burning(.preparing) })
+        check("Cancel is offered while preparing", burn.canCancel)
+        burn.cancel()
+        await wait(until: { burn.phase == .editing })
+        check("Cancel before writing leaves the disc untouched", burn.phase == .editing && burner.jobs.count == before)
+
+        burner.stepDelay = .milliseconds(60)
+        burn.burn()
+        await wait(until: { if case .burning(.burning) = burn.phase { true } else { false } })
+        check("Cancel is gone once writing starts", !burn.canCancel)
+        check("the quit prompt warns that stopping ruins the disc", burn.stopPrompt.detail == "Stopping now ruins the disc.", burn.stopPrompt.detail)
+        await wait(until: { burn.phase == .done })
+
+        burn.tryAgain()
+        burner.stepDelay = .milliseconds(5)
+        burner.failNextBurn = .driveError("The disc could not be written.")
+        burn.burn()
+        await wait(until: { if case .failed = burn.phase { true } else { false } })
+        var message = ""
+        if case .failed(let text) = burn.phase { message = text }
+        check("a failed burn says why", message.contains("The disc could not be written."), message)
+        burn.tryAgain()
+        check("Try Again returns to the list", burn.phase == .editing && burn.items.count == 3)
+
+        burn.eject()
+        check("Eject asks the burner to eject", burner.ejectCount == 1)
+        burn.clear()
+        burner.set(FixtureBurner.blankCD())
+    }
+
+    /// Reads the Mac's real burner through DiscRecordingBurner. Runs only with RIPPLE_REAL_DRIVE=1, and never writes.
+    private static func realDriveChecks() {
+        guard ProcessInfo.processInfo.environment["RIPPLE_REAL_DRIVE"] == "1" else { return }
+        let real = DiscRecordingBurner()
+        let state = real.state()
+        print("INFO real drive: \(real.deviceName ?? "none") -> \(state)")
+        check("the real burner reports a drive when one is connected", (real.deviceName != nil) == (state != .noDrive))
+        if case .ready(let media) = state {
+            check("a blank disc in the real drive reports a type and free space", !media.label.isEmpty && media.blocksFree > 0, "\(media)")
         }
     }
 

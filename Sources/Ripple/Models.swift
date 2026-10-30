@@ -15,7 +15,7 @@ enum LookupState: Equatable {
 
 /// App-wide state that menus, toolbars, and views share.
 @Observable
-final class AppModel {
+final class AppModel: StoppableJob {
     enum Phase: Equatable {
         case empty
         case reading
@@ -44,6 +44,10 @@ final class AppModel {
     }
     var outputFolder: URL = URL.musicDirectory {
         didSet { defaults.set(outputFolder.path, forKey: "outputFolder") }
+    }
+    /// Rip a disc, or burn one.
+    var mode: AppMode = .rip {
+        didSet { defaults.set(mode.rawValue, forKey: "mode") }
     }
     /// MP3 or M4A. MP3 unless the user chooses otherwise.
     var format: RipFormat = .mp3 {
@@ -77,9 +81,11 @@ final class AppModel {
     init(defaults: UserDefaults = Store.defaults) {
         self.defaults = defaults
         Self.current = self
+        Jobs.register(self)
         // Setting properties inside init does not save them again.
         settingsTab = SettingsTab(rawValue: defaults.string(forKey: "settings.tab") ?? "") ?? .general
         if let path = defaults.string(forKey: "outputFolder") { outputFolder = URL(fileURLWithPath: path, isDirectory: true) }
+        mode = AppMode(rawValue: defaults.string(forKey: "mode") ?? "") ?? .rip
         format = RipFormat(rawValue: defaults.string(forKey: "format") ?? "") ?? .mp3
         mp3Quality = MP3Encoder.Quality(rawValue: defaults.string(forKey: "mp3.quality") ?? "") ?? .vbr(2)
         verifyReads = defaults.object(forKey: "verifyReads") as? Bool ?? true
@@ -373,8 +379,16 @@ final class AppModel {
         return nil
     }
 
+    // MARK: StoppableJob
+
+    var isBusy: Bool { isRipping }
+
+    var stopPrompt: (title: String, detail: String, stop: String, keep: String) {
+        ("Stop Ripping?", "Finished tracks are kept. The track in progress is deleted.", "Stop", "Keep Ripping")
+    }
+
     /// Lets a rip finish its clean-up after a cancel. Used when the app quits.
-    func stopRipping() async {
+    func stop() async {
         cancel()
         await ripFinished?.value
     }

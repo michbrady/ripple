@@ -22,6 +22,7 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 - `TrackTags`, `ID3Tag`, `MP4Tagger`: what goes into each file. `ID3Tag` writes ID3v2.4. `MP4Tagger` rebuilds an .m4a with iTunes-style tag atoms and shifts the chunk offsets.
 - `FileNamer`: safe names (`/` and `:`, NFC, 255 bytes, duplicates).
 - `MusicBrainz`, `MusicBrainzClient`, `AlbumMatch`, `CoverArt`: lookup, rate limit and retry, cover fetch with an iTunes fallback.
+- `BurnScanner`, `BurnItem`, `BurnPlan`, `BurnJob`, `DiscBurner` (protocol), `FixtureBurner`: everything burn mode decides, with no UI and no drive. `BurnPlan` counts blocks (CD audio sectors, 2 KB data blocks) and says whether the files fit.
 - `AlbumDraft`, `TrackRow`: the album as shown. The one place that decides whether a lookup or the user's typing wins.
 
 ## Seams
@@ -31,6 +32,7 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 | `AudioDisc` | `DeviceDisc` (real drive), `FixtureDisc` (tones, for tests and machines with no drive; it can fail, recover, or return wrong data to test `SectorReader`) |
 | `AlbumLookup` (app target) | `LiveLookup` (MusicBrainz, Cover Art Archive), `FixtureLookup` (made-up albums) |
 | `TrackWriter` | `MP3TrackWriter`, `M4ATrackWriter` |
+| `DiscBurner` | `DiscRecordingBurner` (the Mac's burner, app target), `FixtureBurner` (records jobs; used by the self-test, snapshots, and test runs) |
 | `MusicBrainzClient.Transport`, `CoverArt.Fetch` | the live network, and fakes in tests |
 
 ## App target
@@ -38,6 +40,8 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 - `AppModel`: phase (empty, reading, ready, ripping, done, failed), the `AlbumDraft`, the lookup task, the rip task, and the saved settings (Output Folder, format, MP3 quality) in an injected `UserDefaults`.
 - `CoverPrep`: makes a cover JPEG or PNG of a sensible size before it is embedded. Views read it through the environment.
 - `DiscMonitor`: DiskArbitration. Watches for CD media and refuses the system's mount of audio discs while Ripple runs, so Music does not open.
+- `BurnModel` (`Burn/`): burn mode. Source Folder, file list with undo, the disc in the drive (watched), Audio Disc or MP3 Disc, and the burn. `BurnView` draws it. `AppModel.mode` switches between rip and burn.
+- `StoppableJob`: ripping and burning both conform. The quit prompt asks every busy job (`Jobs.busy`).
 - `ContentView`: window, album header, cover, track list, bottom bar, match picker.
 - `Snapshot`, `SelfTest`: agent modes (`tools/snap.sh`, `tools/selftest.sh`). Both refuse to run unless `APP_STORE` is set, and then use a settings store that is emptied at launch, so they never touch real settings and never leak into each other.
 
@@ -45,8 +49,9 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 
 `swift test` (RippleKit), `tools/selftest.sh` (the app's own functions on a fixture disc), `tools/snap.sh` (every page, light and dark), `tools/grid-lint.sh`.
 `RIPPLE_LIVE=1 swift test --filter LiveLookup` runs one test against the real MusicBrainz and cover services.
-Real-drive checks are manual: see the stories marked `doing` in `docs/STORIES.md`.
+`RIPPLE_REAL_DRIVE=1` adds a read-only check of the real burner's status to the self-test.
+Real-disc checks are manual: see the stories marked `doing` in `docs/STORIES.md`.
 
 ## Not decided yet
 
-A shared job type for ripping and burning. See `docs/architecture-review-2026-10-30.md`: wait for M5, when there are two jobs.
+Nothing open. `docs/architecture-review-2026-10-30-m5.md` has the reasoning for separate rip and burn models.

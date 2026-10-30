@@ -10,7 +10,7 @@ import SwiftUI
 /// APP_SNAPSHOT_PAGES=empty,tracks limits the pages. Add "settings" to include Settings.
 /// Add APP_ACCENT=<id> to see the pages in another accent.
 enum Snapshot {
-    static func runIfRequested(model: AppModel, openSettings: OpenSettingsAction) {
+    static func runIfRequested(model: AppModel, burn: BurnModel, openSettings: OpenSettingsAction) {
         let env = ProcessInfo.processInfo.environment
         guard let dir = env["APP_SNAPSHOT"], !dir.isEmpty else { return }
         // Snapshots never run against the real database.
@@ -32,11 +32,19 @@ enum Snapshot {
             try? await Task.sleep(for: .seconds(1.5))
             for mode in ["light", "dark"] {
                 NSApp.appearance = NSAppearance(named: mode == "light" ? .aqua : .darkAqua)
+                model.mode = .rip
                 for page in SnapshotPage.allCases where only?.contains(page.rawValue) ?? true {
                     model.showSnapshot(page)
                     try? await Task.sleep(for: .seconds(0.8))
                     capture(to: "\(dir)/\(page.rawValue)-\(mode).png")
                 }
+                for page in BurnSnapshotPage.allCases where only?.contains("burn-\(page.rawValue)") ?? (only == nil) {
+                    model.mode = .burn
+                    burn.showSnapshot(page)
+                    try? await Task.sleep(for: .seconds(0.8))
+                    capture(to: "\(dir)/burn-\(page.rawValue)-\(mode).png")
+                }
+                model.mode = .rip
             }
             if only == nil || only?.contains("settings") == true {
                 let main = NSApp.windows.first { $0.canBecomeMain && !$0.isSheet }

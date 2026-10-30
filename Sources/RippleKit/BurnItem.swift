@@ -3,7 +3,8 @@ import Foundation
 
 /// One MP3 file in the burn list.
 public struct BurnItem: Identifiable, Equatable, Sendable {
-    public var id: String { url.path }
+    /// The file's real path, so the same file reached through a link (/tmp and /private/tmp) is one item.
+    public let id: String
     public var url: URL
     public var title: String
     public var artist: String
@@ -13,6 +14,7 @@ public struct BurnItem: Identifiable, Equatable, Sendable {
     public var trackNumber: Int?
 
     public init(url: URL, title: String, artist: String = "", seconds: Double, bytes: Int, trackNumber: Int? = nil) {
+        self.id = url.resolvingSymlinksInPath().standardizedFileURL.path
         self.url = url
         self.title = title
         self.artist = artist
