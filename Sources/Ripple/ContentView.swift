@@ -6,7 +6,8 @@ struct ContentView: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        VStack(spacing: 0) {
+        @Bindable var model = model
+        return VStack(spacing: 0) {
             content
             if model.hasDisc, !isFailed {
                 Divider()
@@ -14,6 +15,7 @@ struct ContentView: View {
             }
         }
         .navigationTitle(model.windowTitle)
+        .sheet(isPresented: $model.isPickingMatch) { MatchPicker() }
         .toolbar {
             ToolbarItem {
                 Button("Eject", systemImage: "eject") { model.eject() }
@@ -64,23 +66,31 @@ struct ContentView: View {
     }
 }
 
-/// Album, artist, and Cover above the track list.
+/// Album, artist, and Cover above the track list. Album and artist are fields.
 struct AlbumHeader: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         HStack(spacing: Space.lg) {
-            RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
-                .fill(.quaternary)
-                .frame(width: 96, height: 96)
-                .overlay { Image(systemName: "opticaldisc").font(.largeTitle).foregroundStyle(.secondary) }
-                .accessibilityLabel("Cover")
+            CoverView()
             VStack(alignment: .leading, spacing: Space.xs) {
-                Text(model.albumTitle).font(.title2.bold()).lineLimit(1)
-                Text(model.albumArtist).foregroundStyle(.secondary).lineLimit(1)
+                TextField("Album", text: Binding(get: { model.albumTitle }, set: model.setAlbumTitle),
+                          prompt: Text("Unknown Album"))
+                    .textFieldStyle(.plain)
+                    .font(.title2.bold())
+                TextField("Artist", text: Binding(get: { model.albumArtist }, set: model.setAlbumArtist),
+                          prompt: Text("Unknown Artist"))
+                    .textFieldStyle(.plain)
+                    .foregroundStyle(.secondary)
                 Text(summary).font(.callout).foregroundStyle(.secondary)
+                lookupStatus
             }
             Spacer()
+            if model.matches.count > 1 {
+                Button("Choose Album…") { model.isPickingMatch = true }
+                    .disabled(model.isRipping)
+                    .help("Pick another album that matches this disc")
+            }
         }
         .padding(Space.margin)
         .gridArea("album-header")
@@ -88,7 +98,94 @@ struct AlbumHeader: View {
 
     private var summary: String {
         let minutes = Int((model.totalSeconds / 60).rounded())
-        return "\(model.rows.count) tracks · \(minutes) min"
+        let year = model.albumYear.isEmpty ? "" : "\(model.albumYear) · "
+        let disc = model.discCount > 1 ? "Disc \(model.discNumber) of \(model.discCount) · " : ""
+        return "\(year)\(disc)\(model.rows.count) tracks · \(minutes) min"
+    }
+
+    @ViewBuilder
+    private var lookupStatus: some View {
+        switch model.lookupState {
+        case .searching:
+            HStack(spacing: Space.sm) {
+                ProgressView().controlSize(.small)
+                Text("Looking up album…")
+            }
+            .font(.callout).foregroundStyle(.secondary)
+        case .notFound:
+            Text("No match found. Enter the details yourself.").font(.callout).foregroundStyle(.secondary)
+        case .offline:
+            Text("Unable to look up this disc. Enter the details yourself.").font(.callout).foregroundStyle(.secondary)
+        case .idle, .found:
+            EmptyView()
+        }
+    }
+}
+
+/// The Cover: the album's picture, or a placeholder. Drop an image file on it to use your own.
+struct CoverView: View {
+    @Environment(AppModel.self) private var model
+    @State private var isTargeted = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+            .fill(.quaternary)
+            .frame(width: 96, height: 96)
+            .overlay {
+                if let image = model.coverImage {
+                    Image(nsImage: image).resizable().scaledToFill()
+                } else {
+                    Image(systemName: "opticaldisc").font(.largeTitle).foregroundStyle(.secondary)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+            .overlay {
+                if isTargeted {
+                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous).strokeBorder(.tint, lineWidth: 2)
+                }
+            }
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first else { return false }
+                return model.setCover(from: url)
+            } isTargeted: { isTargeted = $0 }
+            .help("Drop an image here to use it as the Cover")
+            .accessibilityLabel("Cover")
+    }
+}
+
+/// Sheet: pick which album matches the disc.
+struct MatchPicker: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var selection: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.lg) {
+            Text("Choose Album").font(.headline)
+            List(model.matches, selection: $selection) { match in
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    Text(match.title).lineLimit(1)
+                    Text("\(match.artist) · \(match.detail)").font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                }
+                .tag(match.id)
+                .padding(.vertical, Space.xs)
+            }
+            .frame(height: 240)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Choose") {
+                    if let selection { model.chooseMatch(id: selection) }
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(selection == nil)
+            }
+        }
+        .padding(Space.margin)
+        .frame(width: 480)
+        .noInitialFocus()
+        .onAppear { selection = model.selectedMatchID }
     }
 }
 
@@ -117,8 +214,7 @@ struct TrackList: View {
         }
     }
 
-    /// The Artist column appears once a lookup or an edit gives any track an artist.
-    private var showsArtist: Bool { model.rows.contains { !$0.artist.isEmpty } }
+    private var showsArtist: Bool { true }
 
     private var header: some View {
         HStack(spacing: Space.md) {
@@ -131,7 +227,8 @@ struct TrackList: View {
         }
         .font(.callout)
         .foregroundStyle(.secondary)
-        .padding(.horizontal, Space.margin)
+        // The list insets its rows a little more than listRowInsets says.
+        .padding(.horizontal, Space.margin + Space.sm)
         .padding(.vertical, Space.sm)
     }
 }
@@ -140,6 +237,7 @@ struct TrackRowView: View {
     @Binding var row: TrackRow
     let locked: Bool
     let showsArtist: Bool
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         HStack(spacing: Space.md) {
@@ -149,11 +247,17 @@ struct TrackRowView: View {
                 .frame(width: 20)
             Text(String(row.number)).monospacedDigit().foregroundStyle(.secondary)
                 .frame(width: 32, alignment: .trailing)
-            Text(row.title).lineLimit(1).truncationMode(.tail)
+            TextField("Title", text: Binding(get: { row.title }, set: { model.setTitle($0, row: row.id) }))
+                .textFieldStyle(.plain)
+                .disabled(locked)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .help(row.title)
             if showsArtist {
-                Text(row.artist).foregroundStyle(.secondary).lineLimit(1)
+                TextField("Artist", text: Binding(get: { row.artist }, set: { model.setArtist($0, row: row.id) }),
+                          prompt: Text("Artist"))
+                    .textFieldStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .disabled(locked)
                     .frame(width: 160, alignment: .leading)
             }
             Text(Self.format(row.seconds)).monospacedDigit().foregroundStyle(.secondary)
@@ -161,7 +265,7 @@ struct TrackRowView: View {
             status.frame(width: 96, height: Space.xl, alignment: .leading)
         }
         .opacity(row.include ? 1 : 0.5)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
         .accessibilityValue(row.include ? "included" : "not included")
     }
 

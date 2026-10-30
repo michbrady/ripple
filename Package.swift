@@ -21,6 +21,6 @@ let package = Package(
             // App code runs on the main thread unless you say otherwise.
             swiftSettings: [.defaultIsolation(MainActor.self)]
         ),
-        .testTarget(name: "RippleKitTests", dependencies: ["RippleKit"]),
+        .testTarget(name: "RippleKitTests", dependencies: ["RippleKit"], resources: [.copy("Fixtures")]),
     ]
 )

@@ -155,7 +155,8 @@ Acceptance:
 - [unit] A saved MusicBrainz response maps to album, artist, year, and titles.
 - [self] Lookups never exceed one request per second, and a 503 retries after a pause.
 - [snap] Titles replace "Track 01" and the album header shows album, artist, and year.
-Status: todo
+Status: done
+Note: Checked live for the MusicBrainz example disc (LiveLookup test, off by default: RIPPLE_LIVE=1). Set LiveLookup.contact to an email or web page before sharing the app: MusicBrainz asks for one in the User-Agent.
 
 ### S-011 Choose between several matches
 As the user, I pick the right release when a disc matches more than one.
@@ -165,7 +166,8 @@ Acceptance:
 - [unit] Matches rank by exact disc-ID match, then format, then country.
 - [snap] The picker lists each release with artist, album, year, country, and track count.
 - [self] Choosing a release updates the header and every title.
-Status: todo
+Status: done
+Note: The picker is a sheet, Choose Album. Snapshot: picker-light.png, picker-dark.png.
 
 ### S-012 Show cover art
 As the user, I see the album cover next to the tracks.
@@ -175,7 +177,8 @@ Acceptance:
 - [self] The cover loads from the Cover Art Archive front image.
 - [self] A 404 leaves a neutral placeholder and no error banner.
 - [snap] The album header shows the cover at a fixed size.
-Status: todo
+Status: done
+Note: Falls back to the iTunes Search API when the Cover Art Archive has no front cover; the fallback only accepts a result whose album name matches. Both checked live for the example disc (the archive answered).
 
 ### S-013 Edit album and track details
 As the user, I fix any field before ripping, or fill them in when nothing matched.
@@ -186,7 +189,7 @@ Acceptance:
 - [self] Edited values flow into the file names and tags.
 - [self] With no network, the window still opens with "Track NN" titles and everything editable.
 - [self] An edit survives choosing a different match only if the user edited that field.
-Status: todo
+Status: done
 
 ### S-014 Replace the cover art
 As the user, I drop my own image on the cover to use it.
@@ -195,7 +198,8 @@ Depends: S-012
 Acceptance:
 - [self] Dropping a JPEG or PNG replaces the cover and the embedded art.
 - [snap] A drop target outline shows while dragging.
-Status: todo
+Status: done
+Note: Drag and drop is tested through the model (setCover), not with a real drag; try dropping an image on the Cover by hand.
 
 ### S-015 Handle multi-disc sets and compilations
 As the user, I get disc folders and "Various Artists" without setting anything.
@@ -206,7 +210,8 @@ Acceptance:
 - [unit] A compilation uses album artist "Various Artists" and puts the track artist in the file name.
 - [unit] A single-disc album gets no disc folder.
 - [manual] Try a real two-disc set and a real compilation.
-Status: todo
+Status: done
+Note: Checked with fixture sets and compilations. The manual check on a real two-disc set and a real compilation is still open.
 
 ## M3 MP3 and tags
 Both formats, tagged the same way.

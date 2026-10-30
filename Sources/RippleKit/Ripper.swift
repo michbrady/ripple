@@ -24,9 +24,18 @@ public struct RipRequest: Sendable {
     /// The Output Folder. Files land in `Artist/Album/` inside it.
     public var folder: URL
     public var quality: MP3Encoder.Quality
+    /// Which disc of a set this is. Sets of two or more discs get a `Disc N` folder.
+    public var discNumber: Int
+    public var discCount: Int
+    /// Compilations put the track artist in each file name.
+    public var isCompilation: Bool
 
     public init(disc: any AudioDisc, tracks: [RipTrack], albumArtist: String, album: String,
-                folder: URL, quality: MP3Encoder.Quality = .vbr(2)) {
+                folder: URL, quality: MP3Encoder.Quality = .vbr(2),
+                discNumber: Int = 1, discCount: Int = 1, isCompilation: Bool = false) {
+        self.discNumber = discNumber
+        self.discCount = discCount
+        self.isCompilation = isCompilation
         self.disc = disc
         self.tracks = tracks
         self.albumArtist = albumArtist
@@ -54,9 +63,12 @@ public enum Ripper {
     public static func rip(_ request: RipRequest, onEvent: @Sendable (RipEvent) -> Void) throws -> [URL] {
         let toc = request.disc.toc
         let fm = FileManager.default
-        let albumDir = request.folder
+        var albumDir = request.folder
             .appending(path: FileNamer.clean(request.albumArtist, fallback: "Unknown Artist"), directoryHint: .isDirectory)
             .appending(path: FileNamer.clean(request.album, fallback: "Unknown Album"), directoryHint: .isDirectory)
+        if request.discCount > 1 {
+            albumDir = albumDir.appending(path: "Disc \(request.discNumber)", directoryHint: .isDirectory)
+        }
         try fm.createDirectory(at: albumDir, withIntermediateDirectories: true)
         defer { removeIfEmpty(albumDir) }
 
@@ -68,7 +80,8 @@ public enum Ripper {
             if Task.isCancelled { throw CancellationError() }
             let track = request.tracks[index]
             let name = FileNamer.unique(
-                FileNamer.trackFileName(number: entry.number, title: track.title, fileExtension: "mp3", trackCount: toc.trackCount),
+                FileNamer.trackFileName(number: entry.number, title: track.title, fileExtension: "mp3",
+                                        trackCount: toc.trackCount, artist: request.isCompilation ? track.artist : nil),
                 taken: taken)
             taken.insert(name)
             onEvent(.started(track: index))

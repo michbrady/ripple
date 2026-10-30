@@ -19,11 +19,19 @@ struct TrackRow: Identifiable, Equatable {
     var seconds: Double
     var include = true
     var status: Status = .waiting
+    /// A title or artist the user typed stays when another match is chosen.
+    var titleEdited = false
+    var artistEdited = false
 }
 
 /// The pages snapshot mode visits.
 enum SnapshotPage: String, CaseIterable {
-    case empty, tracks, ripping, done
+    case empty, tracks, unmatched, picker, ripping, done
+}
+
+/// How the album lookup went.
+enum LookupState: Equatable {
+    case idle, searching, found, notFound, offline
 }
 
 /// App-wide state that menus, toolbars, and views share.
@@ -43,8 +51,17 @@ final class AppModel {
 
     var phase: Phase = .empty
     var rows: [TrackRow] = []
-    var albumTitle = "Unknown Album"
-    var albumArtist = "Unknown Artist"
+    /// Empty until a lookup or the user fills them in; the file names then use "Unknown Album" and "Unknown Artist".
+    var albumTitle = ""
+    var albumArtist = ""
+    var albumYear = ""
+    var discNumber = 1
+    var discCount = 1
+    var matches: [AlbumMatch] = []
+    var selectedMatchID: String?
+    var lookupState: LookupState = .idle
+    var isPickingMatch = false
+    var coverImage: NSImage?
     var isCancelling = false
     /// Settings reopens on the last tab. Test and snapshot runs leave it alone.
     var settingsTab: SettingsTab = SettingsTab(rawValue: UserDefaults.standard.string(forKey: "settings.tab") ?? "") ?? .general {
@@ -61,6 +78,11 @@ final class AppModel {
 
     private(set) var disc: (any AudioDisc)?
     private var bsdName: String?
+    var lookup: any AlbumLookup = LiveLookup()
+    private var lookupTask: Task<Void, Never>?
+    private var albumTitleEdited = false
+    private var albumArtistEdited = false
+    private var customCover = false
     private let monitor = DiscMonitor()
     private var ripWork: Task<[URL], Error>?
     private var ripFinished: Task<Void, Never>?
@@ -77,12 +99,15 @@ final class AppModel {
     var totalSeconds: Double { rows.reduce(0) { $0 + $1.seconds } }
 
     var windowTitle: String {
-        hasDisc && albumTitle != "Unknown Album" ? albumTitle : "Ripple"
+        hasDisc && !albumTitle.isEmpty ? albumTitle : "Ripple"
     }
+
+    var isCompilation: Bool { albumArtist == "Various Artists" }
 
     /// Starts watching for discs. APP_FIXTURE_DISC=1 loads a made-up disc instead.
     func start() {
         if ProcessInfo.processInfo.environment["APP_FIXTURE_DISC"] == "1" {
+            lookup = FixtureLookup()
             load(FixtureDisc(), bsdName: nil)
             return
         }
@@ -124,14 +149,14 @@ final class AppModel {
         }
         self.disc = disc
         self.bsdName = bsdName
-        albumTitle = "Unknown Album"
-        albumArtist = "Unknown Artist"
+        resetAlbum()
         rows = toc.entries.enumerated().compactMap { index, entry in
             guard entry.isAudio else { return nil }
             return TrackRow(id: index, number: entry.number, title: String(format: "Track %02d", entry.number),
                             artist: "", seconds: toc.seconds(ofTrack: index))
         }
         phase = .ready
+        startLookup()
     }
 
     func eject() {
@@ -144,9 +169,106 @@ final class AppModel {
         disc = nil
         bsdName = nil
         rows = []
-        albumTitle = "Unknown Album"
-        albumArtist = "Unknown Artist"
+        resetAlbum()
         phase = .empty
+    }
+
+    private func resetAlbum() {
+        lookupTask?.cancel()
+        albumTitle = ""
+        albumArtist = ""
+        albumYear = ""
+        discNumber = 1
+        discCount = 1
+        matches = []
+        selectedMatchID = nil
+        lookupState = .idle
+        isPickingMatch = false
+        coverImage = nil
+        albumTitleEdited = false
+        albumArtistEdited = false
+        customCover = false
+    }
+
+    // MARK: Album lookup
+
+    private func startLookup() {
+        guard let disc else { return }
+        lookupTask?.cancel()
+        lookupState = .searching
+        let source = lookup
+        let toc = disc.toc
+        lookupTask = Task {
+            do {
+                let found = try await source.matches(for: toc)
+                if Task.isCancelled { return }
+                matches = found
+                guard let best = found.first else {
+                    lookupState = .notFound
+                    return
+                }
+                lookupState = .found
+                apply(best)
+            } catch {
+                if !Task.isCancelled { lookupState = .offline }
+            }
+        }
+    }
+
+    /// Fills the album and track titles from a match. Anything the user typed stays.
+    func apply(_ match: AlbumMatch) {
+        selectedMatchID = match.id
+        if !albumTitleEdited { albumTitle = match.title }
+        if !albumArtistEdited { albumArtist = match.artist }
+        albumYear = match.year
+        discNumber = match.discNumber
+        discCount = match.discCount
+        for index in rows.indices {
+            guard let track = match.tracks.first(where: { $0.number == rows[index].number }) else { continue }
+            if !rows[index].titleEdited { rows[index].title = track.title }
+            if !rows[index].artistEdited { rows[index].artist = track.artist }
+        }
+        if !customCover {
+            let source = lookup
+            Task {
+                guard let data = await source.cover(for: match), selectedMatchID == match.id, !customCover else { return }
+                coverImage = NSImage(data: data)
+            }
+        }
+    }
+
+    func chooseMatch(id: String) {
+        guard let match = matches.first(where: { $0.id == id }) else { return }
+        apply(match)
+    }
+
+    // MARK: Edits
+
+    func setAlbumTitle(_ text: String) {
+        albumTitle = text
+        albumTitleEdited = true
+    }
+
+    func setAlbumArtist(_ text: String) {
+        albumArtist = text
+        albumArtistEdited = true
+    }
+
+    func setTitle(_ text: String, row id: Int) {
+        update(id) { $0.title = text; $0.titleEdited = true }
+    }
+
+    func setArtist(_ text: String, row id: Int) {
+        update(id) { $0.artist = text; $0.artistEdited = true }
+    }
+
+    /// Uses a picture from a file as the Cover. Returns false when the file is not an image.
+    @discardableResult
+    func setCover(from url: URL) -> Bool {
+        guard let image = NSImage(contentsOf: url), image.isValid else { return false }
+        coverImage = image
+        customCover = true
+        return true
     }
 
     // MARK: Output Folder
@@ -173,7 +295,8 @@ final class AppModel {
             return RipTrack(number: row.number, title: row.title, artist: row.artist, include: row.include)
         }
         let request = RipRequest(disc: disc, tracks: tracks, albumArtist: albumArtist, album: albumTitle,
-                                 folder: outputFolder, quality: .vbr(2))
+                                 folder: outputFolder, quality: .vbr(2),
+                                 discNumber: discNumber, discCount: discCount, isCompilation: isCompilation)
         for index in rows.indices { rows[index].status = .waiting }
         isCancelling = false
         phase = .ripping
@@ -240,26 +363,47 @@ final class AppModel {
 
     // MARK: Snapshot pages
 
-    /// Puts the window in the state a snapshot page shows, on a made-up disc.
+    /// Puts the window in the state a snapshot page shows, on a made-up disc and album.
     func showSnapshot(_ page: SnapshotPage) {
-        switch page {
-        case .empty:
+        if page == .empty {
             clear()
-        case .tracks, .ripping, .done:
-            if disc == nil || bsdName != nil || rows.count != 8 {
-                load(FixtureDisc(trackSeconds: [214, 187, 243, 198, 256, 175, 221, 309]), bsdName: nil)
+            return
+        }
+        lookup = FixtureLookup()
+        let toc = FixtureDisc(trackSeconds: [214, 187, 243, 198, 256, 175, 221, 309]).toc
+        if disc?.toc != toc {
+            load(FixtureDisc(trackSeconds: [214, 187, 243, 198, 256, 175, 221, 309]), bsdName: nil)
+        }
+        lookupTask?.cancel()
+        isPickingMatch = false
+        for index in rows.indices { rows[index].status = .waiting }
+        phase = .ready
+        if page == .unmatched {
+            resetAlbum()
+            for index in rows.indices {
+                rows[index].title = String(format: "Track %02d", rows[index].number)
+                rows[index].artist = ""
             }
-            for index in rows.indices { rows[index].status = .waiting }
-            phase = .ready
-            if page == .ripping {
-                for index in rows.indices {
-                    rows[index].status = index < 3 ? .done : index == 3 ? .ripping(0.4) : .waiting
-                }
-                phase = .ripping
-            } else if page == .done {
-                for index in rows.indices { rows[index].status = .done }
-                phase = .done(folder: outputFolder.appending(path: "Unknown Artist/Unknown Album", directoryHint: .isDirectory))
+            lookupState = .notFound
+            return
+        }
+        matches = FixtureLookup.albums(trackCount: rows.count)
+        lookupState = .found
+        apply(matches[0])
+        coverImage = NSImage(data: FixtureLookup.coverPNG())
+        switch page {
+        case .picker:
+            isPickingMatch = true
+        case .ripping:
+            for index in rows.indices {
+                rows[index].status = index < 3 ? .done : index == 3 ? .ripping(0.4) : .waiting
             }
+            phase = .ripping
+        case .done:
+            for index in rows.indices { rows[index].status = .done }
+            phase = .done(folder: outputFolder.appending(path: "The Tones/Sine Waves", directoryHint: .isDirectory))
+        default:
+            break
         }
     }
 }

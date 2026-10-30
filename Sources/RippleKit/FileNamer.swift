@@ -30,12 +30,19 @@ public enum FileNamer {
     }
 
     /// `01 - Title.mp3`. The number gets three digits on discs with more than 99 tracks.
-    public static func trackFileName(number: Int, title: String, fileExtension: String, trackCount: Int = 0) -> String {
+    /// With an `artist` (compilations), `01 - Artist - Title.mp3`.
+    public static func trackFileName(number: Int, title: String, fileExtension: String,
+                                     trackCount: Int = 0, artist: String? = nil) -> String {
         let width = max(trackCount, number) > 99 ? 3 : 2
         let prefix = String(format: "%0\(width)d - ", number)
         let suffix = "." + fileExtension
         let room = maxNameBytes - prefix.utf8.count - suffix.utf8.count - 8 // room for " (2)" and a temp prefix
-        return prefix + clean(title, maxBytes: room, fallback: "Track \(number)") + suffix
+        guard let artist, !artist.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return prefix + clean(title, maxBytes: room, fallback: "Track \(number)") + suffix
+        }
+        let who = clean(artist, maxBytes: room / 3, fallback: "Unknown Artist")
+        let what = clean(title, maxBytes: room - who.utf8.count - 3, fallback: "Track \(number)")
+        return prefix + who + " - " + what + suffix
     }
 
     /// Adds " (2)", " (3)" before the extension until the name is not in `taken`.

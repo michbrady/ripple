@@ -125,3 +125,35 @@ final class Locked<Value>: @unchecked Sendable {
         return body(&value)
     }
 }
+
+@Suite struct AlbumLayoutTests {
+    @Test func multiDiscSetsGetADiscFolder() throws {
+        let folder = try RipperTests.tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var request = RipperTests.request(disc: FixtureDisc(trackSeconds: [1]), folder: folder, titles: ["One"])
+        request.discCount = 2
+        request.discNumber = 2
+        let files = try Ripper.rip(request, onEvent: { _ in })
+        #expect(files.first?.deletingLastPathComponent().path.hasSuffix("The Tones/Sine Waves/Disc 2") == true)
+    }
+
+    @Test func singleDiscAlbumsGetNoDiscFolder() throws {
+        let folder = try RipperTests.tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let files = try Ripper.rip(RipperTests.request(disc: FixtureDisc(trackSeconds: [1]), folder: folder, titles: ["One"]), onEvent: { _ in })
+        #expect(files.first?.deletingLastPathComponent().lastPathComponent == "Sine Waves")
+    }
+
+    @Test func compilationsPutTheTrackArtistInTheFileName() throws {
+        let folder = try RipperTests.tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var request = RipperTests.request(disc: FixtureDisc(trackSeconds: [1, 1]), folder: folder, titles: ["Song A", "Song B"])
+        request.albumArtist = "Various Artists"
+        request.isCompilation = true
+        request.tracks[0].artist = "Ana"
+        request.tracks[1].artist = "AC/DC"
+        let files = try Ripper.rip(request, onEvent: { _ in })
+        #expect(files.map(\.lastPathComponent) == ["01 - Ana - Song A.mp3", "02 - AC-DC - Song B.mp3"])
+        #expect(files[0].deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "Various Artists")
+    }
+}

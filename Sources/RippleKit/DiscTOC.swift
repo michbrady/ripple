@@ -74,25 +74,39 @@ public struct DiscTOC: Equatable, Sendable {
         Double(sectors(ofTrack: index).count) / Double(Self.sectorsPerSecond)
     }
 
-    /// The MusicBrainz disc ID: SHA-1 of the audio tracks' offsets (plus 150 for
-    /// the lead-in), in base64 with `+/=` swapped for `._-`.
+    /// The track layout MusicBrainz uses: audio tracks only, offsets plus 150 for the
+    /// lead-in, and the lead-out moved back before a data session (CD-Extra).
     /// https://musicbrainz.org/doc/Disc_ID_Calculation
-    public var discID: String {
+    var musicBrainzLayout: (first: Int, last: Int, leadOut: Int, offsets: [Int: Int])? {
         let audio = audioTracks
-        guard let first = audio.first, let last = audio.last else { return "" }
+        guard let first = audio.first, let last = audio.last else { return nil }
         var end = leadOut
         if let firstData = entries.first(where: { !$0.isAudio && $0.number > last.number }) {
             end = firstData.lba - Self.dataSessionGap
         }
-        var text = String(format: "%02X%02X%08X", first.number, last.number, end + 150)
+        let offsets = Dictionary(uniqueKeysWithValues: audio.map { ($0.number, $0.lba + 150) })
+        return (first.number, last.number, end + 150, offsets)
+    }
+
+    /// The MusicBrainz disc ID: SHA-1 of the layout, in base64 with `+/=` swapped for `._-`.
+    public var discID: String {
+        guard let layout = musicBrainzLayout else { return "" }
+        var text = String(format: "%02X%02X%08X", layout.first, layout.last, layout.leadOut)
         for number in 1...99 {
-            let offset = audio.first { $0.number == number }.map { $0.lba + 150 } ?? 0
-            text += String(format: "%08X", offset)
+            text += String(format: "%08X", layout.offsets[number] ?? 0)
         }
         let digest = Insecure.SHA1.hash(data: Data(text.utf8))
         return Data(digest).base64EncodedString()
             .replacingOccurrences(of: "+", with: ".")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "-")
+    }
+
+    /// The `toc` value for a MusicBrainz lookup of a disc it does not know yet:
+    /// first track, last track, lead-out, then each track's offset, joined by `+`.
+    public var musicBrainzTOC: String {
+        guard let layout = musicBrainzLayout else { return "" }
+        let offsets = (layout.first...layout.last).compactMap { layout.offsets[$0] }
+        return ([layout.first, layout.last, layout.leadOut] + offsets).map(String.init).joined(separator: "+")
     }
 }

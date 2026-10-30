@@ -33,12 +33,15 @@ enum SelfTest {
             model.outputFolder = out
 
             // S-001: no disc shows the empty state.
+            model.lookup = FixtureLookup(mode: .none)
             model.showSnapshot(.empty)
             check("no disc shows the empty state", model.phase == .empty && !model.hasDisc)
 
             // S-003: a disc shows one row per track, titled "Track NN".
             model.load(FixtureDisc(), bsdName: nil)
+            await wait(until: { model.lookupState == .notFound })
             check("a disc shows its tracks", model.phase == .ready && model.rows.count == 3)
+            check("no match says so and keeps the track names", model.lookupState == .notFound && model.albumTitle.isEmpty)
             check("tracks start as Track 01, Track 02, Track 03", model.rows.map(\.title) == ["Track 01", "Track 02", "Track 03"])
             check("lengths come from the table of contents", model.rows.map { Int($0.seconds.rounded()) } == [2, 3, 2])
             check("the disc ID is 28 characters", model.disc?.toc.discID.count == 28)
@@ -52,7 +55,7 @@ enum SelfTest {
             // S-008: unchecked tracks make no files. S-007: files land in the Output Folder. S-006: named by title.
             model.rows[1].include = false
             check("the Rip button counts the checked tracks", model.checkedCount == 2)
-            model.rows[0].title = "Intro / Overture"
+            model.setTitle("Intro / Overture", row: model.rows[0].id)
             model.rip()
             check("Rip starts ripping", model.phase == .ripping)
             await wait(until: { !model.isRipping })
@@ -76,9 +79,92 @@ enum SelfTest {
             check("Cancel keeps finished tracks and removes the partial file", cancelled == ["01 - Track 01.mp3"], "\(cancelled)")
             check("Cancel returns to the track list", model.phase == .ready)
 
+            await lookupChecks(model: model, out: out)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }
+    }
+
+    /// S-010 to S-015: the album lookup, matches, edits, cover, multi-disc, compilations.
+    private static func lookupChecks(model: AppModel, out: URL) async {
+        let fm = FileManager.default
+
+        // S-010: titles, album, and artist come from the best match.
+        model.eject()
+        model.lookup = FixtureLookup(mode: .found)
+        model.load(FixtureDisc(), bsdName: nil)
+        await wait(until: { model.lookupState == .found })
+        check("a lookup fills the album and artist", model.albumTitle == "Sine Waves" && model.albumArtist == "The Tones")
+        check("a lookup replaces Track NN with real titles", model.rows.map(\.title) == ["Low A", "Rising Fifth", "High/C"])
+        check("the exact match comes first", model.matches.first?.isExactDiscMatch == true && model.matches.count == 2)
+
+        // S-012: the cover loads.
+        await wait(until: { model.coverImage != nil })
+        check("the cover loads from the match", model.coverImage != nil)
+
+        // S-011 and S-013: choosing another match keeps what the user typed, and only that.
+        model.setTitle("My Title", row: model.rows[1].id)
+        model.chooseMatch(id: "fixture-2")
+        check("another match changes the titles the user did not edit", model.rows[0].title == "Low A (Live)")
+        check("another match keeps an edited title", model.rows[1].title == "My Title")
+        check("another match sets disc N of M", model.discNumber == 2 && model.discCount == 2)
+        model.setAlbumTitle("My Album")
+        model.chooseMatch(id: "fixture-1")
+        check("another match keeps an edited album title", model.albumTitle == "My Album")
+        check("choosing the first match again restores unedited titles", model.rows[0].title == "Low A")
+
+        // S-014: a dropped image replaces the cover, and stays through a new match.
+        let png = fm.temporaryDirectory.appending(path: "ripple-cover-\(UUID().uuidString).png")
+        try? FixtureLookup.coverPNG().write(to: png)
+        let before = model.coverImage
+        check("dropping an image replaces the cover", model.setCover(from: png) && model.coverImage !== before)
+        let custom = model.coverImage
+        model.chooseMatch(id: "fixture-2")
+        try? await Task.sleep(for: .milliseconds(300))
+        check("a custom cover stays when another match is chosen", model.coverImage === custom)
+        let text = fm.temporaryDirectory.appending(path: "ripple-\(UUID().uuidString).txt")
+        try? Data("hello".utf8).write(to: text)
+        check("a file that is not an image is refused", !model.setCover(from: text))
+        try? fm.removeItem(at: png)
+        try? fm.removeItem(at: text)
+
+        // S-013: with no network, everything is still editable.
+        model.eject()
+        model.lookup = FixtureLookup(mode: .offline)
+        model.load(FixtureDisc(), bsdName: nil)
+        await wait(until: { model.lookupState == .offline })
+        check("with no network the window opens with Track NN titles", model.lookupState == .offline && model.rows[0].title == "Track 01")
+        model.setAlbumTitle("Typed Album")
+        model.setAlbumArtist("Typed Artist")
+        model.setTitle("Typed Song", row: model.rows[0].id)
+        check("typed details flow into the ripper", model.albumTitle == "Typed Album" && model.rows[0].title == "Typed Song")
+        model.rip()
+        await wait(until: { !model.isRipping })
+        let typed = ((try? fm.contentsOfDirectory(atPath: out.appending(path: "Typed Artist/Typed Album").path)) ?? []).sorted()
+        check("typed details name the files and folders", typed == ["01 - Typed Song.mp3", "02 - Track 02.mp3", "03 - Track 03.mp3"], "\(typed)")
+
+        // S-015: a set of discs gets a Disc folder, and a compilation names files by artist.
+        model.eject()
+        model.lookup = FixtureLookup(mode: .found)
+        model.load(FixtureDisc(trackSeconds: [1, 1]), bsdName: nil)
+        await wait(until: { model.lookupState == .found })
+        model.chooseMatch(id: "fixture-2")
+        model.rip()
+        await wait(until: { !model.isRipping })
+        let disc2 = ((try? fm.contentsOfDirectory(atPath: out.appending(path: "The Tones/Sine Waves (Deluxe Edition)/Disc 2").path)) ?? []).sorted()
+        check("a two-disc set rips into a Disc 2 folder", disc2 == ["01 - Low A (Live).mp3", "02 - Rising Fifth (Live).mp3"], "\(disc2)")
+
+        model.eject()
+        model.load(FixtureDisc(trackSeconds: [1, 1]), bsdName: nil)
+        await wait(until: { model.lookupState == .found })
+        model.setAlbumArtist("Various Artists")
+        model.setAlbumTitle("Mix")
+        model.rip()
+        await wait(until: { !model.isRipping })
+        let mix = ((try? fm.contentsOfDirectory(atPath: out.appending(path: "Various Artists/Mix").path)) ?? []).sorted()
+        check("a compilation puts the artist in each file name", mix == ["01 - The Tones - Low A.mp3", "02 - The Tones - Rising Fifth.mp3"], "\(mix)")
+        model.eject()
     }
 
     private static func wait(until done: () -> Bool, seconds: Double = 20) async {
