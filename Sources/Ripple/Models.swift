@@ -35,6 +35,8 @@ final class AppModel {
     var lookupState: LookupState = .idle
     var isPickingMatch = false
     var coverImage: NSImage?
+    /// The Cover as JPEG or PNG bytes, written into every ripped file.
+    private(set) var coverData: Data?
     var isCancelling = false
     /// Settings reopens on the last tab.
     var settingsTab: SettingsTab = .general {
@@ -171,8 +173,13 @@ final class AppModel {
         matches = []
         lookupState = .idle
         isPickingMatch = false
-        coverImage = nil
+        setCoverData(nil)
         customCover = false
+    }
+
+    private func setCoverData(_ data: Data?) {
+        coverData = data
+        coverImage = data.flatMap { NSImage(data: $0) }
     }
 
     // MARK: Album lookup
@@ -206,8 +213,9 @@ final class AppModel {
         if !customCover {
             let source = lookup
             Task {
-                guard let data = await source.cover(for: match), selectedMatchID == match.id, !customCover else { return }
-                coverImage = NSImage(data: data)
+                guard let data = await source.cover(for: match), selectedMatchID == match.id, !customCover,
+                      let prepared = CoverPrep.prepared(data) else { return }
+                setCoverData(prepared)
             }
         }
     }
@@ -227,8 +235,8 @@ final class AppModel {
     /// Uses a picture from a file as the Cover. Returns false when the file is not an image.
     @discardableResult
     func setCover(from url: URL) -> Bool {
-        guard let image = NSImage(contentsOf: url), image.isValid else { return false }
-        coverImage = image
+        guard let data = try? Data(contentsOf: url), let prepared = CoverPrep.prepared(data) else { return false }
+        setCoverData(prepared)
         customCover = true
         return true
     }
@@ -258,6 +266,7 @@ final class AppModel {
         }
         let request = RipRequest(disc: disc, tracks: tracks, albumArtist: albumArtist, album: albumTitle,
                                  folder: outputFolder, quality: mp3Quality, format: format,
+                                 year: albumYear, cover: coverData,
                                  discNumber: discNumber, discCount: discCount, isCompilation: isCompilation)
         for index in rows.indices { rows[index].status = .waiting }
         isCancelling = false
@@ -343,7 +352,7 @@ final class AppModel {
         if page == .unmatched {
             album.clearDetails()
             matches = []
-            coverImage = nil
+            setCoverData(nil)
             customCover = false
             lookupState = .notFound
             return
@@ -351,7 +360,7 @@ final class AppModel {
         matches = FixtureLookup.albums(trackCount: rows.count)
         lookupState = .found
         apply(matches[0])
-        coverImage = NSImage(data: FixtureLookup.coverPNG())
+        setCoverData(FixtureLookup.coverPNG())
         switch page {
         case .picker:
             isPickingMatch = true

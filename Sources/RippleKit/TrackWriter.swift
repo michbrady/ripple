@@ -56,9 +56,13 @@ final class M4ATrackWriter: TrackWriter {
     enum WriterError: Error { case setup(OSStatus), write(OSStatus) }
 
     private var file: ExtAudioFileRef?
+    private let url: URL
+    private let tags: TrackTags?
 
     /// `bitRate` is in bits per second for the stereo stream.
-    init(url: URL, bitRate: UInt32 = 256_000) throws {
+    init(url: URL, tags: TrackTags? = nil, bitRate: UInt32 = 256_000) throws {
+        self.url = url
+        self.tags = tags
         var output = AudioStreamBasicDescription(
             mSampleRate: 44_100, mFormatID: kAudioFormatMPEG4AAC, mFormatFlags: 0,
             mBytesPerPacket: 0, mFramesPerPacket: 1_024, mBytesPerFrame: 0,
@@ -109,5 +113,6 @@ final class M4ATrackWriter: TrackWriter {
     func finish() async throws {
         if let file { ExtAudioFileDispose(file) }
         file = nil
+        if let tags { try MP4Tagger.apply(tags, to: url) }
     }
 }

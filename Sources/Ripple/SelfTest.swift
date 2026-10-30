@@ -1,6 +1,9 @@
 import AppKit
+import AVFoundation
 import Foundation
+import ImageIO
 import RippleKit
+import UniformTypeIdentifiers
 
 /// Self-test for agents: runs the app's real functions on a made-up disc,
 /// prints PASS or FAIL per check, and quits with exit code 0 or 1.
@@ -81,10 +84,79 @@ enum SelfTest {
 
             await lookupChecks(model: model, out: out)
             await formatChecks(model: model, out: out)
+            await tagChecks(model: model, out: out)
+            coverPrepChecks()
 
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }
+    }
+
+    /// S-019: what the model shows ends up in the files.
+    private static func tagChecks(model: AppModel, out: URL) async {
+        for format in RipFormat.allCases {
+            model.eject()
+            model.lookup = FixtureLookup(mode: .found)
+            model.format = format
+            model.load(FixtureDisc(trackSeconds: [1, 1]), bsdName: nil)
+            await wait(until: { model.lookupState == .found && model.coverData != nil })
+            model.chooseMatch(id: "fixture-2")
+            model.setAlbumTitle("Tagged \(format.title)")
+            model.rip()
+            await wait(until: { !model.isRipping })
+            let folder = out.appending(path: "The Tones/Tagged \(format.title)/Disc 2")
+            let file = folder.appending(path: "01 - Low A (Live).\(format.fileExtension)")
+            let items = (try? await AVURLAsset(url: file).load(.metadata)) ?? []
+            func string(_ id: AVMetadataIdentifier) async -> String? {
+                try? await AVMetadataItem.metadataItems(from: items, filteredByIdentifier: id).first?.load(.stringValue)
+            }
+            func data(_ id: AVMetadataIdentifier) async -> Data? {
+                try? await AVMetadataItem.metadataItems(from: items, filteredByIdentifier: id).first?.load(.dataValue)
+            }
+            let mp3 = format == .mp3
+            let title = await string(mp3 ? .id3MetadataTitleDescription : .iTunesMetadataSongName)
+            let album = await string(mp3 ? .id3MetadataAlbumTitle : .iTunesMetadataAlbum)
+            let picture = await data(mp3 ? .id3MetadataAttachedPicture : .iTunesMetadataCoverArt)
+            check("a ripped \(format.title) carries the title and album", title == "Low A (Live)" && album == "Tagged \(format.title)", "\(title ?? "nil") / \(album ?? "nil")")
+            check("a ripped \(format.title) carries the cover", picture == model.coverData && picture != nil)
+            if mp3 {
+                let set = await string(.id3MetadataPartOfASet)
+                let recorded = await string(.id3MetadataRecordingTime)
+                let year = await string(.id3MetadataYear)
+                check("a ripped MP3 carries disc 2 of 2 and the year", set == "2/2" && (recorded ?? year) != nil, "\(set ?? "nil") / \(recorded ?? year ?? "nil")")
+            } else {
+                let disc = await data(.iTunesMetadataDiscNumber).map { [UInt8]($0) }
+                check("a ripped M4A carries disc 2 of 2", disc == [0, 0, 0, 2, 0, 2], "\(String(describing: disc))")
+            }
+        }
+        model.eject()
+    }
+
+    /// Covers are kept when they are small JPEG or PNG, and converted otherwise.
+    private static func coverPrepChecks() {
+        func image(_ size: Int, as type: UTType) -> Data {
+            let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+                                    space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            context.setFillColor(CGColor(red: 0.2, green: 0.5, blue: 0.8, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            let data = NSMutableData()
+            let destination = CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil)!
+            CGImageDestinationAddImage(destination, context.makeImage()!, nil)
+            CGImageDestinationFinalize(destination)
+            return data as Data
+        }
+        func width(_ data: Data) -> Int? {
+            (CGImageSourceCreateWithData(data as CFData, nil)
+                .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) } as? [CFString: Any])?[kCGImagePropertyPixelWidth] as? Int
+        }
+        let small = image(500, as: .png)
+        check("a small PNG cover is kept as it is", CoverPrep.prepared(small) == small)
+        let big = image(2_400, as: .png)
+        let shrunk = CoverPrep.prepared(big)
+        check("a huge cover becomes a JPEG of at most 1,000 pixels", shrunk.flatMap(width) == 1_000 && shrunk?.prefix(2) == Data([0xFF, 0xD8]))
+        let tiff = image(300, as: .tiff)
+        check("a TIFF cover becomes a JPEG", CoverPrep.prepared(tiff)?.prefix(2) == Data([0xFF, 0xD8]))
+        check("bytes that are not an image are refused", CoverPrep.prepared(Data("not an image".utf8)) == nil)
     }
 
     /// S-007, S-016 to S-018: Output Folder, format, and quality are saved and used.

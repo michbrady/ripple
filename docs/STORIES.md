@@ -256,7 +256,8 @@ Acceptance:
 - [unit] Reading back an M4A gives the same MP4 tags and cover.
 - [manual] Music shows the cover, title, track number, and disc N of M.
 - [unit] A compilation sets the compilation flag.
-Status: todo
+Status: done
+Note: Tags are read back with AVFoundation in unit tests and in the self-test, and both container formats pass afinfo. Still to do by hand: open one MP3 and one M4A in Music and check the cover, title, track number, and disc N of M show.
 
 ## M4 Trustworthy rips
 Say when a rip may be bad, instead of staying silent.

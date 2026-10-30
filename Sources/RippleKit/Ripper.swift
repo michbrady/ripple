@@ -25,6 +25,9 @@ public struct RipRequest: Sendable {
     public var folder: URL
     public var quality: MP3Encoder.Quality
     public var format: RipFormat
+    public var year: String
+    /// JPEG or PNG bytes for the cover, written into every file.
+    public var cover: Data?
     /// Which disc of a set this is. Sets of two or more discs get a `Disc N` folder.
     public var discNumber: Int
     public var discCount: Int
@@ -33,8 +36,11 @@ public struct RipRequest: Sendable {
 
     public init(disc: any AudioDisc, tracks: [RipTrack], albumArtist: String, album: String,
                 folder: URL, quality: MP3Encoder.Quality = .vbr(2), format: RipFormat = .mp3,
+                year: String = "", cover: Data? = nil,
                 discNumber: Int = 1, discCount: Int = 1, isCompilation: Bool = false) {
         self.format = format
+        self.year = year
+        self.cover = cover
         self.discNumber = discNumber
         self.discCount = discCount
         self.isCompilation = isCompilation
@@ -103,10 +109,11 @@ public enum Ripper {
         var succeeded = false
         defer { if !succeeded { try? fm.removeItem(at: partial) } }
 
+        let tags = Self.tags(for: index, request: request)
         let writer: any TrackWriter
         switch request.format {
-        case .mp3: writer = try MP3TrackWriter(url: partial, quality: request.quality)
-        case .m4a: writer = try M4ATrackWriter(url: partial)
+        case .mp3: writer = try MP3TrackWriter(url: partial, quality: request.quality, id3: ID3Tag.make(tags))
+        case .m4a: writer = try M4ATrackWriter(url: partial, tags: tags)
         }
         let sectors = request.disc.toc.sectors(ofTrack: index)
         var position = sectors.lowerBound
@@ -120,6 +127,18 @@ public enum Ripper {
         try await writer.finish()
         try fm.moveItem(at: partial, to: file)
         succeeded = true
+    }
+
+    static func tags(for index: Int, request: RipRequest) -> TrackTags {
+        let toc = request.disc.toc
+        let track = request.tracks[index]
+        return TrackTags(
+            title: track.title,
+            artist: track.artist.isEmpty ? request.albumArtist : track.artist,
+            album: request.album, albumArtist: request.albumArtist, year: request.year,
+            trackNumber: toc.entries[index].number, trackCount: toc.audioTracks.count,
+            discNumber: request.discNumber, discCount: request.discCount,
+            isCompilation: request.isCompilation, cover: request.cover)
     }
 
     /// Removes an album folder (and its artist folder) when a cancelled rip left nothing in them.

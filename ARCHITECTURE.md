@@ -17,7 +17,8 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 
 - `DiscTOC`: table of contents, track lengths, MusicBrainz disc ID and `toc` string.
 - `AudioDisc` (protocol), `FixtureDisc`: sectors of a disc. Real adapter: `Ripple/Disc/DeviceDisc.swift`.
-- `MP3Encoder`: LAME wrapper. `Ripper`: copies included tracks to MP3 files, with cancel and clean-up.
+- `MP3Encoder`: LAME wrapper. `TrackWriter` (protocol) with `MP3TrackWriter` (ID3 tag, then audio, then the Xing frame) and `M4ATrackWriter` (Core Audio AAC). `Ripper`: copies included tracks to files in the chosen format, with cancel and clean-up.
+- `TrackTags`, `ID3Tag`, `MP4Tagger`: what goes into each file. `ID3Tag` writes ID3v2.4. `MP4Tagger` rebuilds an .m4a with iTunes-style tag atoms and shifts the chunk offsets.
 - `FileNamer`: safe names (`/` and `:`, NFC, 255 bytes, duplicates).
 - `MusicBrainz`, `MusicBrainzClient`, `AlbumMatch`, `CoverArt`: lookup, rate limit and retry, cover fetch with an iTunes fallback.
 - `AlbumDraft`, `TrackRow`: the album as shown. The one place that decides whether a lookup or the user's typing wins.
@@ -28,14 +29,16 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 | --- | --- |
 | `AudioDisc` | `DeviceDisc` (real drive), `FixtureDisc` (tones, for tests and machines with no drive) |
 | `AlbumLookup` (app target) | `LiveLookup` (MusicBrainz, Cover Art Archive), `FixtureLookup` (made-up albums) |
+| `TrackWriter` | `MP3TrackWriter`, `M4ATrackWriter` |
 | `MusicBrainzClient.Transport`, `CoverArt.Fetch` | the live network, and fakes in tests |
 
 ## App target
 
-- `AppModel`: phase (empty, reading, ready, ripping, done, failed), the `AlbumDraft`, the lookup task, the rip task, Output Folder. Views read it through the environment.
+- `AppModel`: phase (empty, reading, ready, ripping, done, failed), the `AlbumDraft`, the lookup task, the rip task, and the saved settings (Output Folder, format, MP3 quality) in an injected `UserDefaults`.
+- `CoverPrep`: makes a cover JPEG or PNG of a sensible size before it is embedded. Views read it through the environment.
 - `DiscMonitor`: DiskArbitration. Watches for CD media and refuses the system's mount of audio discs while Ripple runs, so Music does not open.
 - `ContentView`: window, album header, cover, track list, bottom bar, match picker.
-- `Snapshot`, `SelfTest`: agent modes (`tools/snap.sh`, `tools/selftest.sh`). Both refuse to run unless `APP_STORE` is set, so they never touch real settings.
+- `Snapshot`, `SelfTest`: agent modes (`tools/snap.sh`, `tools/selftest.sh`). Both refuse to run unless `APP_STORE` is set, and then use a settings store that is emptied at launch, so they never touch real settings and never leak into each other.
 
 ## Checks
 
