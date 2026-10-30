@@ -1,0 +1,22 @@
+# Ripple glossary
+
+One name per thing. Buttons, menus, titles, tooltips, and errors use these words.
+
+| Term | Means | Not |
+| --- | --- | --- |
+| Disc | The physical CD in the drive | CD (in the UI), media, volume |
+| Track | One song on a disc or in the burn list | song, file, item |
+| Album | The title, artist, year, and cover that belong to a disc | release (except in the match picker), record |
+| Rip | Copy a disc's tracks to files on the Mac | import, extract, convert, grab |
+| Burn | Write tracks onto a blank disc | record, write |
+| Audio Disc | A burned disc that plays in any CD player (MP3s converted to disc audio) | music CD, Red Book |
+| MP3 Disc | A burned disc holding the MP3 files unchanged | data CD, MP3 CD |
+| Source Folder | The Mac folder whose MP3 files get burned | input folder, library |
+| Format | MP3 or M4A, the kind of file a rip makes | codec, encoder, type |
+| Output Folder | Where ripped albums are saved | destination, library |
+| Match | An album the lookup found for a disc | result, release (in the picker the row says release details) |
+| Cover | The album's picture | art, artwork, image |
+| Needs Attention | A track that may have errors after ripping | failed, bad, corrupt |
+| Show in Finder | Reveal the finished album folder | Open folder, Reveal |
+| Eject | Push the disc out of the drive | Remove, Unmount |
+| Cancel | Stop a rip or a burn before it finishes | Abort, Stop |
