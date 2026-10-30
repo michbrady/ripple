@@ -77,6 +77,12 @@ struct GeneralSettings: View {
             Text("M4A files use AAC at 256 kbps.").font(.callout).foregroundStyle(.secondary)
         }
         Section("Disc") {
+            Toggle("Eject when done", isOn: $model.ejectWhenDone)
+            Text("Ejects the disc after a rip with no problems. A disc with tracks that need attention stays in.")
+                .font(.callout).foregroundStyle(.secondary)
+            Toggle("Start when a disc matches", isOn: $model.startOnMatch)
+            Text("Starts ripping as soon as the album is found. Waits if there is no match or more than one.")
+                .font(.callout).foregroundStyle(.secondary)
             Toggle("Check for errors", isOn: $model.verifyReads)
             Text("Reads each part of the disc again to make sure the two reads agree. Slower, but it catches bad data on scratched discs.")
                 .font(.callout).foregroundStyle(.secondary)

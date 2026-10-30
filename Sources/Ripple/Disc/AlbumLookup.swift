@@ -25,7 +25,8 @@ nonisolated struct LiveLookup: AlbumLookup {
 
 /// Made-up albums for the fixture disc, self-test, and snapshots. Never touches the network.
 nonisolated struct FixtureLookup: AlbumLookup {
-    enum Mode: Sendable { case found, none, offline }
+    /// `single` finds exactly one exact match, the case that starts a rip on its own.
+    enum Mode: Sendable { case found, single, none, offline }
     struct Offline: Error {}
 
     var mode: Mode = .found
@@ -48,12 +49,13 @@ nonisolated struct FixtureLookup: AlbumLookup {
     func matches(for toc: DiscTOC) async throws -> [AlbumMatch] {
         switch mode {
         case .found: Self.albums(trackCount: toc.audioTracks.count)
+        case .single: Array(Self.albums(trackCount: toc.audioTracks.count).prefix(1))
         case .none: []
         case .offline: throw Offline()
         }
     }
 
-    func cover(for match: AlbumMatch) async -> Data? { mode == .found ? Self.coverPNG() : nil }
+    func cover(for match: AlbumMatch) async -> Data? { mode == .found || mode == .single ? Self.coverPNG() : nil }
 
     /// A plain teal square, as PNG bytes.
     static func coverPNG() -> Data {

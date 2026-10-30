@@ -5,7 +5,7 @@ import RippleKit
 
 /// The pages snapshot mode visits.
 enum SnapshotPage: String, CaseIterable {
-    case empty, tracks, unmatched, picker, ripping, done, attention
+    case empty, tracks, unmatched, picker, ripping, done, attention, unreadable, folderProblem
 }
 
 /// How the album lookup went.
@@ -22,7 +22,7 @@ final class AppModel: StoppableJob {
         case ready
         case ripping
         case done(folder: URL?)
-        case failed(String)
+        case failed(RipFailure)
     }
 
     /// The window that is up, for the quit prompt.
@@ -56,6 +56,14 @@ final class AppModel: StoppableJob {
     var mp3Quality: MP3Encoder.Quality = .vbr(2) {
         didSet { defaults.set(mp3Quality.rawValue, forKey: "mp3.quality") }
     }
+    /// Eject the disc when a rip finishes with no problems.
+    var ejectWhenDone = true {
+        didSet { defaults.set(ejectWhenDone, forKey: "ejectWhenDone") }
+    }
+    /// Start ripping as soon as the album is found, when exactly one album matches the disc.
+    var startOnMatch = false {
+        didSet { defaults.set(startOnMatch, forKey: "startOnMatch") }
+    }
     /// Read every part of the disc until two reads agree. Slower, and it catches bad data.
     var verifyReads = true {
         didSet { defaults.set(verifyReads, forKey: "verifyReads") }
@@ -69,6 +77,11 @@ final class AppModel: StoppableJob {
     var lookup: any AlbumLookup = LiveLookup()
     private var lookupTask: Task<Void, Never>?
     private var customCover = false
+    private var coverTask: Task<Void, Never>?
+    /// The disc was ejected after a rip. The page stays up; Retry needs the disc back.
+    private(set) var isDiscEjected = false
+    /// How a disc is opened. Tests replace it to simulate a disc that cannot be read.
+    var openDisc: @Sendable (String) throws -> any AudioDisc = { try DeviceDisc(bsdName: $0) }
     private let monitor = DiscMonitor()
     private var ripWork: Task<[URL], Error>?
     /// The file each ripped track went to, so Retry can replace it.
@@ -89,6 +102,8 @@ final class AppModel: StoppableJob {
         format = RipFormat(rawValue: defaults.string(forKey: "format") ?? "") ?? .mp3
         mp3Quality = MP3Encoder.Quality(rawValue: defaults.string(forKey: "mp3.quality") ?? "") ?? .vbr(2)
         verifyReads = defaults.object(forKey: "verifyReads") as? Bool ?? true
+        ejectWhenDone = defaults.object(forKey: "ejectWhenDone") as? Bool ?? true
+        startOnMatch = defaults.object(forKey: "startOnMatch") as? Bool ?? false
     }
 
     // MARK: Disc
@@ -129,17 +144,19 @@ final class AppModel: StoppableJob {
         monitor.start()
     }
 
-    private func discInserted(bsdName name: String) {
+    func discInserted(bsdName name: String) {
         guard !isRipping else { return }
         phase = .reading
+        isDiscEjected = false
+        let opener = openDisc
         Task {
             do {
-                let disc = try await Task.detached { try DeviceDisc(bsdName: name) }.value
+                let disc = try await Task.detached { try opener(name) }.value
                 load(disc, bsdName: name)
             } catch {
                 disc = nil
                 bsdName = name
-                phase = .failed("Ripple cannot read this disc.")
+                phase = .failed(RipFailure(message: "Ripple cannot read this disc.", action: .tryAgain))
             }
         }
     }
@@ -147,7 +164,12 @@ final class AppModel: StoppableJob {
     private func discRemoved(bsdName name: String) {
         guard name == bsdName else { return }
         if isRipping { cancel() }
-        clear()
+        if case .done = phase {
+            // The finished page stays up after the disc goes out.
+            isDiscEjected = true
+        } else {
+            clear()
+        }
     }
 
     /// Shows a disc: one row per audio track, titled "Track 01" until a lookup or an edit renames it.
@@ -156,11 +178,12 @@ final class AppModel: StoppableJob {
         guard !toc.audioTracks.isEmpty else {
             self.disc = nil
             self.bsdName = bsdName
-            phase = .failed("This is not an audio disc.")
+            phase = .failed(RipFailure(message: "This is not an audio disc.", action: .eject))
             return
         }
         self.disc = disc
         self.bsdName = bsdName
+        isDiscEjected = false
         resetAlbum()
         rows = toc.entries.enumerated().compactMap { index, entry in
             guard entry.isAudio else { return nil }
@@ -169,6 +192,31 @@ final class AppModel: StoppableJob {
         }
         phase = .ready
         startLookup()
+    }
+
+    /// Pushes the disc out but keeps the finished page up.
+    private func ejectDisc() {
+        if let bsdName { monitor?.eject(bsdName: bsdName) }
+        isDiscEjected = true
+    }
+
+    /// The one button on a failure page.
+    func performFailureAction() {
+        guard case .failed(let failure) = phase else { return }
+        switch failure.action {
+        case .tryAgain:
+            if disc != nil { phase = .ready } else if let bsdName { discInserted(bsdName: bsdName) } else { clear() }
+        case .chooseFolder:
+            chooseFolder()
+            resumeAfterFailure()
+        case .eject:
+            eject()
+        }
+    }
+
+    /// Back to the track list after a failure that left the disc in place.
+    func resumeAfterFailure() {
+        if case .failed = phase, disc != nil { phase = .ready }
     }
 
     func eject() {
@@ -180,6 +228,7 @@ final class AppModel: StoppableJob {
     private func clear() {
         disc = nil
         bsdName = nil
+        isDiscEjected = false
         rows = []
         resetAlbum()
         phase = .empty
@@ -219,6 +268,11 @@ final class AppModel: StoppableJob {
                 }
                 lookupState = .found
                 apply(best)
+                // One exact match: start ripping once the cover has had its chance.
+                if startOnMatch, found.count == 1, best.isExactDiscMatch {
+                    await coverTask?.value
+                    if !Task.isCancelled, phase == .ready { rip() }
+                }
             } catch {
                 if !Task.isCancelled { lookupState = .offline }
             }
@@ -230,7 +284,7 @@ final class AppModel: StoppableJob {
         album.apply(match)
         if !customCover {
             let source = lookup
-            Task {
+            coverTask = Task {
                 guard let data = await source.cover(for: match), selectedMatchID == match.id, !customCover,
                       let prepared = CoverPrep.prepared(data) else { return }
                 setCoverData(prepared)
@@ -278,7 +332,7 @@ final class AppModel: StoppableJob {
 
     /// Rips one track again, replacing its file. Used for a track marked Needs Attention.
     func retry(_ id: Int) {
-        guard !isRipping, case .done = phase, let row = rows.first(where: { $0.id == id }) else { return }
+        guard !isRipping, !isDiscEjected, case .done = phase, let row = rows.first(where: { $0.id == id }) else { return }
         resumePhase = phase
         resumeStatus = (id, row.status)
         startRip(only: id)
@@ -358,6 +412,7 @@ final class AppModel: StoppableJob {
         switch result {
         case .success(let files):
             phase = .done(folder: files.first?.deletingLastPathComponent() ?? doneFolder(resume))
+            if ejectWhenDone, needsAttentionCount == 0, !isDiscEjected { ejectDisc() }
         case .failure(let error):
             for index in rows.indices {
                 if case .ripping = rows[index].status { rows[index].status = .waiting }
@@ -365,11 +420,11 @@ final class AppModel: StoppableJob {
             if let resume, let resumeStatus {
                 // A cancelled or failed Retry puts the track back as it was.
                 update(resumeStatus.id) { $0.status = resumeStatus.status }
-                phase = error is CancellationError ? resume : .failed("Ripple stopped: \(error.localizedDescription)")
+                phase = error is CancellationError ? resume : .failed(RipFailure.describing(error, folder: outputFolder))
             } else if error is CancellationError {
                 phase = .ready
             } else {
-                phase = .failed("Ripple stopped: \(error.localizedDescription)")
+                phase = .failed(RipFailure.describing(error, folder: outputFolder))
             }
         }
     }
@@ -401,6 +456,11 @@ final class AppModel: StoppableJob {
     func showSnapshot(_ page: SnapshotPage) {
         if page == .empty {
             clear()
+            return
+        }
+        if page == .unreadable {
+            clear()
+            phase = .failed(RipFailure(message: "Ripple cannot read this disc.", action: .tryAgain))
             return
         }
         lookup = FixtureLookup()
@@ -435,6 +495,8 @@ final class AppModel: StoppableJob {
         case .done:
             for index in rows.indices { rows[index].status = .done }
             phase = .done(folder: outputFolder.appending(path: "The Tones/Sine Waves", directoryHint: .isDirectory))
+        case .folderProblem:
+            phase = .failed(RipFailure.describing(CocoaError(.fileWriteOutOfSpace), folder: outputFolder))
         case .attention:
             for index in rows.indices { rows[index].status = .done }
             rows[2].status = .needsAttention(unreadable: 3, suspect: 0)

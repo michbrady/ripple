@@ -87,6 +87,7 @@ enum SelfTest {
             await tagChecks(model: model, out: out)
             await attentionChecks(model: model, out: out)
             await burnChecks(burn: burn, out: out)
+            await polishChecks(model: model, out: out)
             realDriveChecks()
             coverPrepChecks()
 
@@ -227,6 +228,109 @@ enum SelfTest {
         check("Eject asks the burner to eject", burner.ejectCount == 1)
         burn.clear()
         burner.set(FixtureBurner.blankCD())
+    }
+
+    /// S-022 to S-024: eject when done, start on a match, and clear messages.
+    private static func polishChecks(model: AppModel, out: URL) async {
+        let fm = FileManager.default
+        model.lookup = FixtureLookup(mode: .none)
+        model.startOnMatch = false
+        model.verifyReads = true
+        model.format = .mp3
+
+        func fresh(_ title: String, tracks: [Double] = [1, 1], faults: FixtureDisc.Faults? = nil) {
+            model.eject()
+            model.load(FixtureDisc(trackSeconds: tracks, faults: faults), bsdName: nil)
+            model.setAlbumArtist("Polish")
+            model.setAlbumTitle(title)
+        }
+        func isDone() -> Bool { if case .done = model.phase { true } else { false } }
+
+        // S-022: Eject when done.
+        model.ejectWhenDone = true
+        fresh("Clean")
+        model.rip()
+        await wait(until: { isDone() })
+        check("a clean rip ejects the disc when Eject when done is on", model.isDiscEjected)
+        check("the finished page stays up after the disc is ejected", isDone() && model.rows.count == 2 && model.rippedCount == 2)
+
+        model.ejectWhenDone = false
+        fresh("Stay")
+        model.rip()
+        await wait(until: { isDone() })
+        check("with Eject when done off the disc stays in", !model.isDiscEjected)
+
+        model.ejectWhenDone = true
+        fresh("Scratched", tracks: [1, 1, 1], faults: .init(failFirst: [100: 8]))
+        model.rip()
+        await wait(until: { isDone() })
+        check("a rip with tracks that need attention keeps the disc in", !model.isDiscEjected && model.needsAttentionCount == 1)
+        model.retry(model.rows[1].id)
+        await wait(until: { isDone() && !model.isRipping })
+        check("the disc ejects once a Retry clears the last warning", model.isDiscEjected && model.needsAttentionCount == 0)
+
+        // S-023: Start when a disc matches.
+        model.ejectWhenDone = false
+        model.startOnMatch = true
+        model.lookup = FixtureLookup(mode: .single)
+        model.eject()
+        model.load(FixtureDisc(trackSeconds: [1, 1]), bsdName: nil)
+        await wait(until: { isDone() })
+        let started = ((try? fm.contentsOfDirectory(atPath: out.appending(path: "The Tones/Sine Waves").path)) ?? []).sorted()
+        check("one exact match starts ripping by itself", isDone() && started == ["01 - Low A.mp3", "02 - Rising Fifth.mp3"], "\(started)")
+
+        for (mode, name) in [(FixtureLookup.Mode.found, "several matches"), (.none, "no match")] {
+            model.lookup = FixtureLookup(mode: mode)
+            model.eject()
+            model.load(FixtureDisc(trackSeconds: [1, 1]), bsdName: nil)
+            await wait(until: { model.lookupState == .found || model.lookupState == .notFound })
+            try? await Task.sleep(for: .milliseconds(500))
+            check("\(name) waits for the user", model.phase == .ready)
+        }
+        model.startOnMatch = false
+        model.lookup = FixtureLookup(mode: .single)
+        model.eject()
+        model.load(FixtureDisc(trackSeconds: [1, 1]), bsdName: nil)
+        await wait(until: { model.lookupState == .found })
+        try? await Task.sleep(for: .milliseconds(500))
+        check("with Start when a disc matches off, one exact match waits too", model.phase == .ready)
+
+        // S-024: clear messages.
+        model.lookup = FixtureLookup(mode: .none)
+        model.eject()
+        model.openDisc = { _ in throw DeviceDisc.OpenError.noTableOfContents }
+        model.discInserted(bsdName: "disk99")
+        await wait(until: { if case .failed = model.phase { true } else { false } })
+        check("an unreadable disc says so, with one action",
+              model.phase == .failed(RipFailure(message: "Ripple cannot read this disc.", action: .tryAgain)), "\(model.phase)")
+        model.openDisc = { _ in FixtureDisc(trackSeconds: [1, 1]) }
+        model.performFailureAction()
+        await wait(until: { model.phase == .ready })
+        check("Try Again reads the disc again", model.phase == .ready && model.rows.count == 2)
+
+        let locked = out.appending(path: "Locked", directoryHint: .isDirectory)
+        try? fm.createDirectory(at: locked, withIntermediateDirectories: true)
+        try? fm.setAttributes([.posixPermissions: 0o500], ofItemAtPath: locked.path)
+        let good = model.outputFolder
+        model.outputFolder = locked
+        model.rip()
+        await wait(until: { if case .failed = model.phase { true } else { false } })
+        var failure: RipFailure?
+        if case .failed(let found) = model.phase { failure = found }
+        check("an unwritable folder stops the rip with a message naming the folder",
+              failure?.message == "Ripple cannot save to \u{201C}Locked\u{201D}. The folder is not writable. Choose another Output Folder." && failure?.action == .chooseFolder,
+              failure?.message ?? "nil")
+        try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: locked.path)
+        model.outputFolder = good
+        model.resumeAfterFailure()
+        check("choosing another folder returns to the track list with the disc still loaded", model.phase == .ready && model.rows.count == 2)
+        model.rip()
+        await wait(until: { isDone() })
+        check("the rip works once the folder is fine", isDone())
+
+        model.openDisc = { try DeviceDisc(bsdName: $0) }
+        model.ejectWhenDone = true
+        model.eject()
     }
 
     /// Reads the Mac's real burner through DiscRecordingBurner. Runs only with RIPPLE_REAL_DRIVE=1, and never writes.
@@ -371,6 +475,13 @@ enum SelfTest {
         fresh.verifyReads = false
         check("the Check for Errors setting survives a restart", !AppModel(defaults: defaults).verifyReads)
         fresh.verifyReads = true
+        check("a fresh install ejects when done and does not start by itself", fresh.ejectWhenDone && !fresh.startOnMatch)
+        fresh.ejectWhenDone = false
+        fresh.startOnMatch = true
+        let second = AppModel(defaults: defaults)
+        check("Eject when done and Start when a disc matches survive a restart", !second.ejectWhenDone && second.startOnMatch)
+        fresh.ejectWhenDone = true
+        fresh.startOnMatch = false
 
         // A new AppModel on the same store is a restart.
         fresh.format = .m4a

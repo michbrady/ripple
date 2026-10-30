@@ -388,7 +388,8 @@ Depends: S-005
 Acceptance:
 - [self] With eject on, the disc ejects after a clean rip, and with errors it stays in.
 - [snap] Settings has an "Eject when done" toggle, on by default.
-Status: todo
+Status: done
+Note: The finished page stays up after the disc goes out, and Retry then waits for the disc to come back. Real ejecting (DiskArbitration) is untested: this Mac had no music CD.
 
 ### S-023 Start on disc insert
 As the user, I choose whether inserting a disc starts the rip.
@@ -398,7 +399,8 @@ Acceptance:
 - [self] With auto-start on, a disc that matches exactly starts ripping after lookup.
 - [self] With no match or several matches, it waits for the user.
 - [snap] Settings shows the toggle, off by default.
-Status: todo
+Status: done
+Note: Starts only for exactly one exact match, after the cover has had its chance to load.
 
 ### S-024 Show clear messages for problems
 As the user, I know what went wrong and what to do.
@@ -408,14 +410,16 @@ Acceptance:
 - [self] A full disk or unwritable folder stops the rip with a message naming the folder.
 - [self] An unreadable disc shows "Ripple cannot read this disc" with a Try again button.
 - [snap] Each message page uses plain words and one action.
-Status: todo
+Status: done
+Note: An unreadable disc is simulated by replacing how the app opens a disc; a real unwritable folder is used for the folder message; the full-disk wording is checked on the error mapping, not on a full disk. Snapshots: unreadable-light.png, folderProblem-light.png.
 
 ### S-025 Add an app icon
 As the user, I see a real icon in the Dock and window.
 Depends: S-005
 Acceptance:
 - [snap] The snapshot shows the icon in light and dark looks.
-Status: todo
+Status: done
+Note: Rendered in every look with tools/icon_review.sh (/tmp/Ripple-icon.png). Look at the Dock by hand.
 
 ## Dropped
 - Accounts, sync, sharing, and teams: Ripple has one user and no server.

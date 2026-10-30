@@ -54,6 +54,14 @@ struct ContentView: View {
         }
     }
 
+    private func failureButton(_ action: RipFailure.Action) -> String {
+        switch action {
+        case .tryAgain: "Try Again"
+        case .chooseFolder: "Choose Folder…"
+        case .eject: "Eject"
+        }
+    }
+
     private var isFailed: Bool {
         if case .failed = model.phase { return true }
         return false
@@ -74,11 +82,12 @@ struct ContentView: View {
                 Text("Reading Disc…").foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .failed(let message):
+        case .failed(let failure):
             ContentUnavailableView {
-                Label(message, systemImage: "exclamationmark.triangle")
+                Label(failure.message, systemImage: "exclamationmark.triangle")
             } actions: {
-                Button("Eject") { model.eject() }
+                Button(failureButton(failure.action)) { model.performFailureAction() }
+                    .keyboardShortcut(.defaultAction)
             }
         case .ready, .ripping, .done:
             VStack(spacing: 0) {
@@ -310,8 +319,8 @@ struct TrackRowView: View {
                 Button("Retry", systemImage: "arrow.clockwise") { model.retry(row.id) }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
-                    .disabled(model.isRipping)
-                    .help("Rip this track again")
+                    .disabled(model.isRipping || model.isDiscEjected)
+                    .help(model.isDiscEjected ? "Insert the disc to rip this track again" : "Rip this track again")
             }
         }
     }
@@ -368,6 +377,7 @@ struct BottomBar: View {
                 .help("Stop ripping. Finished tracks are kept (Esc)")
         case .done(let folder):
             Text("Ripped \(model.rippedCount) Tracks").foregroundStyle(.secondary)
+            if model.isDiscEjected { Text("Disc ejected").foregroundStyle(.secondary) }
             if model.needsAttentionCount > 0 {
                 Label("\(model.needsAttentionCount) Need Attention", systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(Surface.warning)
