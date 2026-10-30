@@ -17,6 +17,8 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | Output Folder | Where ripped albums are saved | destination, library |
 | Match | An album the lookup found for a disc | result, release (in the picker the row says release details) |
 | Cover | The album's picture | art, artwork, image |
+| Check for Errors | Read each part of the disc until two reads agree | verify, secure mode |
+| Retry | Rip one track again, replacing its file | Re-rip, Redo |
 | Needs Attention | A track that may have errors after ripping | failed, bad, corrupt |
 | Show in Finder | Reveal the finished album folder | Open folder, Reveal |
 | Eject | Push the disc out of the drive | Remove, Unmount |

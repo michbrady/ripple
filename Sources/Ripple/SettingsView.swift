@@ -76,5 +76,10 @@ struct GeneralSettings: View {
             .disabled(model.format != .mp3)
             Text("M4A files use AAC at 256 kbps.").font(.callout).foregroundStyle(.secondary)
         }
+        Section("Disc") {
+            Toggle("Check for errors", isOn: $model.verifyReads)
+            Text("Reads each part of the disc again to make sure the two reads agree. Slower, but it catches bad data on scratched discs.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
     }
 }

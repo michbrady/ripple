@@ -26,6 +26,11 @@ public struct RipRequest: Sendable {
     public var quality: MP3Encoder.Quality
     public var format: RipFormat
     public var year: String
+    /// Read every sector until two reads agree. Slower, and catches discs that return wrong data without an error.
+    public var verify: Bool
+    public var maxRetries: Int
+    /// Tracks to rip again: track index -> the file to replace once the new one is finished.
+    public var replacing: [Int: URL]
     /// JPEG or PNG bytes for the cover, written into every file.
     public var cover: Data?
     /// Which disc of a set this is. Sets of two or more discs get a `Disc N` folder.
@@ -36,8 +41,12 @@ public struct RipRequest: Sendable {
 
     public init(disc: any AudioDisc, tracks: [RipTrack], albumArtist: String, album: String,
                 folder: URL, quality: MP3Encoder.Quality = .vbr(2), format: RipFormat = .mp3,
-                year: String = "", cover: Data? = nil,
+                year: String = "", cover: Data? = nil, verify: Bool = true, maxRetries: Int = 3,
+                replacing: [Int: URL] = [:],
                 discNumber: Int = 1, discCount: Int = 1, isCompilation: Bool = false) {
+        self.verify = verify
+        self.maxRetries = maxRetries
+        self.replacing = replacing
         self.format = format
         self.year = year
         self.cover = cover
@@ -58,6 +67,8 @@ public enum RipEvent: Sendable, Equatable {
     /// 0 to 1, for the track with this index in the table of contents.
     case progress(track: Int, fraction: Double)
     case finished(track: Int, file: URL)
+    /// The track was saved, but some of it could not be read cleanly.
+    case needsAttention(track: Int, unreadable: Int, suspect: Int)
 }
 
 /// Copies tracks from a disc to MP3 or M4A files.
@@ -87,22 +98,30 @@ public enum Ripper {
             guard index < request.tracks.count, request.tracks[index].include else { continue }
             if Task.isCancelled { throw CancellationError() }
             let track = request.tracks[index]
-            let name = FileNamer.unique(
-                FileNamer.trackFileName(number: entry.number, title: track.title, fileExtension: request.format.fileExtension,
-                                        trackCount: toc.trackCount, artist: request.isCompilation ? track.artist : nil),
-                taken: taken)
-            taken.insert(name)
+            let file: URL
+            if let existing = request.replacing[index] {
+                file = existing
+            } else {
+                let name = FileNamer.unique(
+                    FileNamer.trackFileName(number: entry.number, title: track.title, fileExtension: request.format.fileExtension,
+                                            trackCount: toc.trackCount, artist: request.isCompilation ? track.artist : nil),
+                    taken: taken)
+                taken.insert(name)
+                file = albumDir.appending(path: name)
+            }
             onEvent(.started(track: index))
-            let file = albumDir.appending(path: name)
-            try await ripTrack(index: index, request: request, to: file, onEvent: onEvent)
+            let issues = try await ripTrack(index: index, request: request, to: file, onEvent: onEvent)
             files.append(file)
             onEvent(.finished(track: index, file: file))
+            if !issues.isClean {
+                onEvent(.needsAttention(track: index, unreadable: issues.unreadable.count, suspect: issues.suspect.count))
+            }
         }
         return files
     }
 
     private static func ripTrack(index: Int, request: RipRequest, to file: URL,
-                                 onEvent: @Sendable (RipEvent) -> Void) async throws {
+                                 onEvent: @Sendable (RipEvent) -> Void) async throws -> ReadIssues {
         let fm = FileManager.default
         let ext = request.format.fileExtension
         let partial = file.deletingLastPathComponent().appending(path: ".ripple-\(UUID().uuidString).partial.\(ext)")
@@ -116,17 +135,23 @@ public enum Ripper {
         case .m4a: writer = try M4ATrackWriter(url: partial, tags: tags)
         }
         let sectors = request.disc.toc.sectors(ofTrack: index)
+        var reader = SectorReader(disc: request.disc, verify: request.verify, maxRetries: request.maxRetries)
         var position = sectors.lowerBound
         while position < sectors.upperBound {
             if Task.isCancelled { throw CancellationError() }
             let count = min(chunkSectors, sectors.upperBound - position)
-            try writer.write(try request.disc.readSectors(start: position, count: count))
+            try writer.write(try reader.read(start: position, count: count))
             position += count
             onEvent(.progress(track: index, fraction: Double(position - sectors.lowerBound) / Double(max(1, sectors.count))))
         }
         try await writer.finish()
-        try fm.moveItem(at: partial, to: file)
+        if fm.fileExists(atPath: file.path) {
+            _ = try fm.replaceItemAt(file, withItemAt: partial)
+        } else {
+            try fm.moveItem(at: partial, to: file)
+        }
         succeeded = true
+        return reader.issues
     }
 
     static func tags(for index: Int, request: RipRequest) -> TrackTags {

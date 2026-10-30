@@ -18,6 +18,7 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 - `DiscTOC`: table of contents, track lengths, MusicBrainz disc ID and `toc` string.
 - `AudioDisc` (protocol), `FixtureDisc`: sectors of a disc. Real adapter: `Ripple/Disc/DeviceDisc.swift`.
 - `MP3Encoder`: LAME wrapper. `TrackWriter` (protocol) with `MP3TrackWriter` (ID3 tag, then audio, then the Xing frame) and `M4ATrackWriter` (Core Audio AAC). `Ripper`: copies included tracks to files in the chosen format, with cancel and clean-up.
+- `SectorReader`: retries failed reads, and with Check for Errors reads again until two reads agree, clearing the drive's cache in between. Unreadable sectors become silence and are listed in `ReadIssues`; the ripper saves the track and reports `needsAttention`.
 - `TrackTags`, `ID3Tag`, `MP4Tagger`: what goes into each file. `ID3Tag` writes ID3v2.4. `MP4Tagger` rebuilds an .m4a with iTunes-style tag atoms and shifts the chunk offsets.
 - `FileNamer`: safe names (`/` and `:`, NFC, 255 bytes, duplicates).
 - `MusicBrainz`, `MusicBrainzClient`, `AlbumMatch`, `CoverArt`: lookup, rate limit and retry, cover fetch with an iTunes fallback.
@@ -27,7 +28,7 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 
 | Seam | Adapters |
 | --- | --- |
-| `AudioDisc` | `DeviceDisc` (real drive), `FixtureDisc` (tones, for tests and machines with no drive) |
+| `AudioDisc` | `DeviceDisc` (real drive), `FixtureDisc` (tones, for tests and machines with no drive; it can fail, recover, or return wrong data to test `SectorReader`) |
 | `AlbumLookup` (app target) | `LiveLookup` (MusicBrainz, Cover Art Archive), `FixtureLookup` (made-up albums) |
 | `TrackWriter` | `MP3TrackWriter`, `M4ATrackWriter` |
 | `MusicBrainzClient.Transport`, `CoverArt.Fetch` | the live network, and fakes in tests |

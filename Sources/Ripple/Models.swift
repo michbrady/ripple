@@ -5,7 +5,7 @@ import RippleKit
 
 /// The pages snapshot mode visits.
 enum SnapshotPage: String, CaseIterable {
-    case empty, tracks, unmatched, picker, ripping, done
+    case empty, tracks, unmatched, picker, ripping, done, attention
 }
 
 /// How the album lookup went.
@@ -52,6 +52,10 @@ final class AppModel {
     var mp3Quality: MP3Encoder.Quality = .vbr(2) {
         didSet { defaults.set(mp3Quality.rawValue, forKey: "mp3.quality") }
     }
+    /// Read every part of the disc until two reads agree. Slower, and it catches bad data.
+    var verifyReads = true {
+        didSet { defaults.set(verifyReads, forKey: "verifyReads") }
+    }
 
     /// Saved settings live here. Test and snapshot runs get their own store, never the real one.
     let defaults: UserDefaults
@@ -63,6 +67,11 @@ final class AppModel {
     private var customCover = false
     private let monitor = DiscMonitor()
     private var ripWork: Task<[URL], Error>?
+    /// The file each ripped track went to, so Retry can replace it.
+    private var trackFiles: [Int: URL] = [:]
+    /// Set while one track is being ripped again: where to go back to if that is cancelled.
+    private var resumePhase: Phase?
+    private var resumeStatus: (id: Int, status: TrackRow.Status)?
     private var ripFinished: Task<Void, Never>?
 
     init(defaults: UserDefaults = Store.defaults) {
@@ -73,6 +82,7 @@ final class AppModel {
         if let path = defaults.string(forKey: "outputFolder") { outputFolder = URL(fileURLWithPath: path, isDirectory: true) }
         format = RipFormat(rawValue: defaults.string(forKey: "format") ?? "") ?? .mp3
         mp3Quality = MP3Encoder.Quality(rawValue: defaults.string(forKey: "mp3.quality") ?? "") ?? .vbr(2)
+        verifyReads = defaults.object(forKey: "verifyReads") as? Bool ?? true
     }
 
     // MARK: Disc
@@ -80,6 +90,8 @@ final class AppModel {
     var hasDisc: Bool { disc != nil }
     var isRipping: Bool { phase == .ripping }
     var checkedCount: Int { rows.filter(\.include).count }
+    var rippedCount: Int { rows.filter { if case .done = $0.status { true } else if case .needsAttention = $0.status { true } else { false } }.count }
+    var needsAttentionCount: Int { rows.filter { if case .needsAttention = $0.status { true } else { false } }.count }
     var totalSeconds: Double { rows.reduce(0) { $0 + $1.seconds } }
 
     var windowTitle: String {
@@ -256,19 +268,35 @@ final class AppModel {
 
     // MARK: Rip
 
-    func rip() {
-        guard let disc, phase == .ready, checkedCount > 0 else { return }
+    func rip() { startRip(only: nil) }
+
+    /// Rips one track again, replacing its file. Used for a track marked Needs Attention.
+    func retry(_ id: Int) {
+        guard !isRipping, case .done = phase, let row = rows.first(where: { $0.id == id }) else { return }
+        resumePhase = phase
+        resumeStatus = (id, row.status)
+        startRip(only: id)
+    }
+
+    private func startRip(only target: Int?) {
+        guard let disc, target != nil || phase == .ready, target != nil || checkedCount > 0 else { return }
         let toc = disc.toc
         let byIndex = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
         let tracks = toc.entries.indices.map { index -> RipTrack in
             guard let row = byIndex[index] else { return RipTrack(number: toc.entries[index].number, title: "", include: false) }
-            return RipTrack(number: row.number, title: row.title, artist: row.artist, include: row.include)
+            return RipTrack(number: row.number, title: row.title, artist: row.artist, include: target.map { $0 == index } ?? row.include)
         }
-        let request = RipRequest(disc: disc, tracks: tracks, albumArtist: albumArtist, album: albumTitle,
+        var request = RipRequest(disc: disc, tracks: tracks, albumArtist: albumArtist, album: albumTitle,
                                  folder: outputFolder, quality: mp3Quality, format: format,
-                                 year: albumYear, cover: coverData,
+                                 year: albumYear, cover: coverData, verify: verifyReads,
                                  discNumber: discNumber, discCount: discCount, isCompilation: isCompilation)
-        for index in rows.indices { rows[index].status = .waiting }
+        if let target {
+            if let file = trackFiles[target] { request.replacing = [target: file] }
+            update(target) { $0.status = .waiting }
+        } else {
+            trackFiles = [:]
+            for index in rows.indices { rows[index].status = .waiting }
+        }
         isCancelling = false
         phase = .ripping
         let work = Task.detached(priority: .userInitiated) { [weak self] in
@@ -294,9 +322,17 @@ final class AppModel {
         case .started(let track):
             update(track) { $0.status = .ripping(0) }
         case .progress(let track, let fraction):
-            update(track) { if $0.status != .done { $0.status = .ripping(fraction) } }
-        case .finished(let track, _):
+            update(track) { row in
+                switch row.status {
+                case .waiting, .ripping: row.status = .ripping(fraction)
+                case .done, .needsAttention: break
+                }
+            }
+        case .finished(let track, let file):
+            trackFiles[track] = file
             update(track) { $0.status = .done }
+        case .needsAttention(let track, let unreadable, let suspect):
+            update(track) { $0.status = .needsAttention(unreadable: unreadable, suspect: suspect) }
         }
     }
 
@@ -308,20 +344,33 @@ final class AppModel {
     private func finishRip(_ result: Result<[URL], Error>) {
         ripWork = nil
         isCancelling = false
+        let resume = resumePhase
+        let resumeStatus = resumeStatus
+        resumePhase = nil
+        self.resumeStatus = nil
         guard disc != nil else { return }
         switch result {
         case .success(let files):
-            phase = .done(folder: files.first?.deletingLastPathComponent())
+            phase = .done(folder: files.first?.deletingLastPathComponent() ?? doneFolder(resume))
         case .failure(let error):
             for index in rows.indices {
                 if case .ripping = rows[index].status { rows[index].status = .waiting }
             }
-            if error is CancellationError {
+            if let resume, let resumeStatus {
+                // A cancelled or failed Retry puts the track back as it was.
+                update(resumeStatus.id) { $0.status = resumeStatus.status }
+                phase = error is CancellationError ? resume : .failed("Ripple stopped: \(error.localizedDescription)")
+            } else if error is CancellationError {
                 phase = .ready
             } else {
                 phase = .failed("Ripple stopped: \(error.localizedDescription)")
             }
         }
+    }
+
+    private func doneFolder(_ phase: Phase?) -> URL? {
+        if case .done(let folder)? = phase { return folder }
+        return nil
     }
 
     /// Lets a rip finish its clean-up after a cancel. Used when the app quits.
@@ -371,6 +420,11 @@ final class AppModel {
             phase = .ripping
         case .done:
             for index in rows.indices { rows[index].status = .done }
+            phase = .done(folder: outputFolder.appending(path: "The Tones/Sine Waves", directoryHint: .isDirectory))
+        case .attention:
+            for index in rows.indices { rows[index].status = .done }
+            rows[2].status = .needsAttention(unreadable: 3, suspect: 0)
+            rows[5].status = .needsAttention(unreadable: 0, suspect: 2)
             phase = .done(folder: outputFolder.appending(path: "The Tones/Sine Waves", directoryHint: .isDirectory))
         default:
             break

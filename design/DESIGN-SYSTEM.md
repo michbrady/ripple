@@ -11,9 +11,9 @@ Ripple keeps Apple's look. Only the accent is a token. Add each token file when 
 ## Spacing (`UI/Grid.swift`)
 - Use `Space` on the 4 pt grid. Mark custom pages with `.gridArea` and `.gridProbe`.
 
-## Status colors (add to `UI/Surfaces.swift` with the first status story)
+## Status colors (`UI/Surfaces.swift`)
 - Track status uses an icon and a word, never color alone: waiting, ripping, done, Needs Attention.
-- One warning color, for Needs Attention and over-capacity burns.
+- `Surface.warning` is the one warning color, for Needs Attention and over-capacity burns. Each use has a warning icon and words.
 
 ## Radius (`UI/Radius.swift`, add with the album header)
 - `sm 8` controls, `md 12` cards. The Cover uses `sm`. Inner radius = outer radius minus inset.

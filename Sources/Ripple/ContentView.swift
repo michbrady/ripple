@@ -224,7 +224,7 @@ struct TrackList: View {
             Text("Title").frame(maxWidth: .infinity, alignment: .leading)
             if showsArtist { Text("Artist").frame(width: 160, alignment: .leading) }
             Text("Length").frame(width: 64, alignment: .trailing)
-            Spacer().frame(width: 96)
+            Spacer().frame(width: 144)
         }
         .font(.callout)
         .foregroundStyle(.secondary)
@@ -263,7 +263,7 @@ struct TrackRowView: View {
             }
             Text(Self.format(row.seconds)).monospacedDigit().foregroundStyle(.secondary)
                 .frame(width: 64, alignment: .trailing)
-            status.frame(width: 96, height: Space.xl, alignment: .leading)
+            status.frame(width: 144, height: Space.xl, alignment: .leading)
         }
         .opacity(row.include ? 1 : 0.5)
         .accessibilityElement(children: .contain)
@@ -279,7 +279,25 @@ struct TrackRowView: View {
             ProgressView(value: fraction).accessibilityLabel("Ripping \(row.title)")
         case .done:
             Label("Done", systemImage: "checkmark.circle.fill").foregroundStyle(.secondary)
+        case .needsAttention(let unreadable, let suspect):
+            HStack(spacing: Space.xs) {
+                Label("Needs Attention", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Surface.warning)
+                    .help(attentionHelp(unreadable: unreadable, suspect: suspect))
+                Button("Retry", systemImage: "arrow.clockwise") { model.retry(row.id) }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .disabled(model.isRipping)
+                    .help("Rip this track again")
+            }
         }
+    }
+
+    private func attentionHelp(unreadable: Int, suspect: Int) -> String {
+        var parts: [String] = []
+        if unreadable > 0 { parts.append("\(unreadable) unreadable \(unreadable == 1 ? "spot" : "spots") became silence") }
+        if suspect > 0 { parts.append("\(suspect) \(suspect == 1 ? "spot" : "spots") may have errors") }
+        return parts.joined(separator: ", ") + ". Clean the disc and rip this track again."
     }
 
     static func format(_ seconds: Double) -> String {
@@ -326,7 +344,11 @@ struct BottomBar: View {
                 .disabled(model.isCancelling)
                 .help("Stop ripping. Finished tracks are kept (Esc)")
         case .done(let folder):
-            Text("Ripped \(model.rows.filter { $0.status == .done }.count) Tracks").foregroundStyle(.secondary)
+            Text("Ripped \(model.rippedCount) Tracks").foregroundStyle(.secondary)
+            if model.needsAttentionCount > 0 {
+                Label("\(model.needsAttentionCount) Need Attention", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Surface.warning)
+            }
             Button("Show in Finder") {
                 if let folder { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
             }
@@ -351,14 +373,14 @@ struct BottomBar: View {
             switch row.status {
             case .waiting: total
             case .ripping(let fraction): total + fraction
-            case .done: total + 1
+            case .done, .needsAttention: total + 1
             }
         }
         return sum / Double(checked.count)
     }
 
     private var progressText: String {
-        let done = checked.filter { $0.status == .done }.count
+        let done = checked.filter { if case .ripping = $0.status { false } else if case .waiting = $0.status { false } else { true } }.count
         let current = checked.first { if case .ripping = $0.status { true } else { false } }
         let position = min(done + 1, checked.count)
         return "Ripping \(position) of \(checked.count)" + (current.map { " · \($0.title)" } ?? "")

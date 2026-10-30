@@ -270,7 +270,8 @@ Acceptance:
 - [unit] A read error on a sector retries up to a set number of times.
 - [self] A fixture that fails twice then succeeds gives a clean track.
 - [self] Reading a sector range twice and comparing catches a mismatch.
-Status: todo
+Status: done
+Note: Checked on a fixture disc that fails, fails then recovers, or returns wrong data without an error. Not yet tried on a real scratched disc: whether the 2,000-sector hop really clears a drive's cache is unproven. The Check for Errors setting turns the repeat reads off.
 
 ### S-021 Flag tracks that may have errors
 As the user, I see which tracks need attention and can retry them.
@@ -280,7 +281,8 @@ Acceptance:
 - [self] A track whose retries ran out is marked needs attention and still saved.
 - [snap] The row shows a warning icon, and the done page lists those tracks.
 - [self] A Retry button on that row re-rips just that track.
-Status: todo
+Status: done
+Note: Snapshot: attention-light.png, attention-dark.png (the story called it 08-needs-attention). A cancelled Retry leaves the old file untouched.
 
 ## M5 Burn
 Turn MP3 files into an audio CD. Snapshot pages: 09-burn-empty, 10-burn-list, 11-burning, 12-burn-done.

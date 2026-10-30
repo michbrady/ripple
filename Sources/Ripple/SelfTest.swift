@@ -85,11 +85,61 @@ enum SelfTest {
             await lookupChecks(model: model, out: out)
             await formatChecks(model: model, out: out)
             await tagChecks(model: model, out: out)
+            await attentionChecks(model: model, out: out)
             coverPrepChecks()
 
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }
+    }
+
+    /// S-020, S-021: a scratched disc is saved, flagged, and can be ripped again.
+    private static func attentionChecks(model: AppModel, out: URL) async {
+        let fm = FileManager.default
+        model.eject()
+        model.lookup = FixtureLookup(mode: .none)
+        model.format = .mp3
+        model.verifyReads = true
+        // Sector 100 is in track 2. It fails 8 times: more than one rip's retries, fewer than two rips'.
+        let disc = FixtureDisc(trackSeconds: [1, 1, 1], faults: .init(failFirst: [100: 8]))
+        model.load(disc, bsdName: nil)
+        model.setAlbumArtist("Scratched")
+        model.setAlbumTitle("Disc")
+        model.rip()
+        await wait(until: { !model.isRipping })
+        let folder = out.appending(path: "Scratched/Disc")
+        func names() -> [String] { ((try? fm.contentsOfDirectory(atPath: folder.path)) ?? []).sorted() }
+        check("a track that cannot be read cleanly is still saved", names() == ["01 - Track 01.mp3", "02 - Track 02.mp3", "03 - Track 03.mp3"], "\(names())")
+        check("that track is marked Needs Attention", model.rows[1].status == .needsAttention(unreadable: 1, suspect: 0), "\(model.rows[1].status)")
+        check("the other tracks are done", model.rows[0].status == .done && model.rows[2].status == .done)
+        check("the page counts the tracks that need attention", model.needsAttentionCount == 1 && model.rippedCount == 3)
+        let before = (try? Data(contentsOf: folder.appending(path: "02 - Track 02.mp3"))) ?? Data()
+
+        model.retry(model.rows[1].id)
+        check("Retry starts ripping again", model.phase == .ripping)
+        await wait(until: { !model.isRipping })
+        let after = (try? Data(contentsOf: folder.appending(path: "02 - Track 02.mp3"))) ?? Data()
+        check("Retry rips the track cleanly this time", model.rows[1].status == .done && model.needsAttentionCount == 0, "\(model.rows[1].status)")
+        check("Retry replaces the file and adds no copy", names().count == 3 && after != before)
+        check("the page is done again after a Retry", { if case .done = model.phase { true } else { false } }())
+
+        // With checking off, a disc that returns wrong data goes unnoticed; with it on, it is repaired.
+        for verify in [false, true] {
+            model.eject()
+            model.verifyReads = verify
+            let faults = FixtureDisc.Faults(corruptFirst: [100: 1])
+            model.load(FixtureDisc(trackSeconds: [1, 1, 1], faults: faults), bsdName: nil)
+            model.setAlbumArtist("Corrupt")
+            model.setAlbumTitle(verify ? "Checked" : "Unchecked")
+            model.rip()
+            await wait(until: { !model.isRipping })
+            // Three one-second tracks are 3 chunks of up to 26 sectors each: 9 reads if nothing is repeated.
+            let reads = faults.reads
+            check(verify ? "Check for Errors reads more than once" : "without Check for Errors each part is read once",
+                  verify ? reads > 9 : reads == 9, "\(reads) reads")
+        }
+        model.verifyReads = true
+        model.eject()
     }
 
     /// S-019: what the model shows ends up in the files.
@@ -169,6 +219,10 @@ enum SelfTest {
         let defaults = UserDefaults(suiteName: suite)!
         let fresh = AppModel(defaults: defaults)
         check("a fresh install defaults to MP3 with variable quality", fresh.format == .mp3 && fresh.mp3Quality == .vbr(2))
+        check("a fresh install checks for errors", fresh.verifyReads)
+        fresh.verifyReads = false
+        check("the Check for Errors setting survives a restart", !AppModel(defaults: defaults).verifyReads)
+        fresh.verifyReads = true
 
         // A new AppModel on the same store is a restart.
         fresh.format = .m4a

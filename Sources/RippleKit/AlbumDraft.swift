@@ -6,6 +6,8 @@ public struct TrackRow: Identifiable, Equatable, Sendable {
         case waiting
         case ripping(Double)
         case done
+        /// Saved, but some of the track could not be read cleanly.
+        case needsAttention(unreadable: Int, suspect: Int)
     }
 
     /// The index in the disc's table of contents.

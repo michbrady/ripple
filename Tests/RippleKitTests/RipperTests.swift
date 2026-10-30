@@ -103,15 +103,160 @@ import Testing
         #expect(names == ["01 - One.mp3"], "left behind: \(names)")
     }
 
-    @Test func unreadableSectorFailsTheTrackAndRemovesItsFile() async throws {
-        let folder = try Self.tempFolder()
+    @Test func anUnreadableSectorSavesTheTrackAndFlagsIt() async throws {
+        let folder = try RipperTests.tempFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let disc = FixtureDisc(trackSeconds: [1, 1], badSectors: [100])
-        await #expect(throws: DiscError.unreadable(sector: 100)) {
-            _ = try await Ripper.rip(Self.request(disc: disc, folder: folder, titles: ["Good", "Bad"]), onEvent: { _ in })
+        let events = Locked<[RipEvent]>([])
+        let files = try await Ripper.rip(Self.request(disc: disc, folder: folder, titles: ["Good", "Scratched"])) { event in
+            events.withLock { $0.append(event) }
         }
-        let names = ((try? FileManager.default.contentsOfDirectory(atPath: folder.appending(path: "The Tones/Sine Waves").path)) ?? []).sorted()
-        #expect(names == ["01 - Good.mp3"])
+        #expect(files.map(\.lastPathComponent) == ["01 - Good.mp3", "02 - Scratched.mp3"])
+        let seen = events.withLock { $0 }
+        #expect(seen.contains(.needsAttention(track: 1, unreadable: 1, suspect: 0)))
+        #expect(!seen.contains { if case .needsAttention(let track, _, _) = $0 { track == 0 } else { false } }, "the clean track is not flagged")
+        let file = try AVAudioFile(forReading: files[1])
+        #expect(abs(Double(file.length) / file.processingFormat.sampleRate - 1.0) < 0.15, "the file keeps its full length")
+    }
+
+    @Test func aSectorThatFailsTwiceIsRetriedAndNotFlagged() async throws {
+        let folder = try RipperTests.tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let disc = FixtureDisc(trackSeconds: [1, 1], faults: .init(failFirst: [100: 2]))
+        let events = Locked<[RipEvent]>([])
+        _ = try await Ripper.rip(Self.request(disc: disc, folder: folder, titles: ["A", "B"])) { event in
+            events.withLock { $0.append(event) }
+        }
+        #expect(!events.withLock { $0 }.contains { if case .needsAttention = $0 { true } else { false } })
+    }
+
+    @Test func aRetryReplacesTheOldFileInPlace() async throws {
+        let folder = try RipperTests.tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let faults = FixtureDisc.Faults(failFirst: [100: 8])
+        let disc = FixtureDisc(trackSeconds: [1, 1], faults: faults)
+        let first = try await Ripper.rip(Self.request(disc: disc, folder: folder, titles: ["A", "B"]), onEvent: { _ in })
+        let before = try Data(contentsOf: first[1])
+
+        var again = Self.request(disc: disc, folder: folder, titles: ["A", "B"])
+        again.tracks[0].include = false
+        again.replacing = [1: first[1]]
+        let events = Locked<[RipEvent]>([])
+        let second = try await Ripper.rip(again) { event in events.withLock { $0.append(event) } }
+        #expect(second == [first[1]], "the same file")
+        #expect(!events.withLock { $0 }.contains { if case .needsAttention = $0 { true } else { false } }, "the retry read it cleanly")
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: first[1].deletingLastPathComponent().path)) ?? []).sorted()
+        #expect(names == ["01 - A.mp3", "02 - B.mp3"], "no duplicate: \(names)")
+        #expect(try Data(contentsOf: first[1]) != before, "the file was rebuilt")
+    }
+
+    @Test func aCancelledRetryKeepsTheOldFile() async throws {
+        let folder = try RipperTests.tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let disc = FixtureDisc(trackSeconds: [1, 20])
+        let first = try await Ripper.rip(Self.request(disc: disc, folder: folder, titles: ["A", "B"]), onEvent: { _ in })
+        let before = try Data(contentsOf: first[1])
+        var again = Self.request(disc: disc, folder: folder, titles: ["A", "B"])
+        again.tracks[0].include = false
+        again.replacing = [1: first[1]]
+        let request = again
+        let task = Task.detached {
+            try await Ripper.rip(request) { event in
+                if case .progress(_, let fraction) = event, fraction > 0.2 { withUnsafeCurrentTask { $0?.cancel() } }
+            }
+        }
+        await #expect(throws: CancellationError.self) { _ = try await task.value }
+        #expect(try Data(contentsOf: first[1]) == before)
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: first[1].deletingLastPathComponent().path)) ?? []).sorted()
+        #expect(names == ["01 - A.mp3", "02 - B.mp3"], "no partial file left: \(names)")
+    }
+}
+
+@Suite struct SectorReaderTests {
+    static let pristine = FixtureDisc(trackSeconds: [4])
+    static func expected(_ start: Int, _ count: Int) throws -> Data { try pristine.readSectors(start: start, count: count) }
+
+    @Test func aCleanDiscReadsAsIs() throws {
+        var reader = SectorReader(disc: FixtureDisc(trackSeconds: [4]))
+        #expect(try reader.read(start: 10, count: 26) == Self.expected(10, 26))
+        #expect(reader.issues.isClean && reader.issues.retries == 0)
+    }
+
+    @Test func aReadThatFailsTwiceSucceedsOnTheThirdTry() throws {
+        let disc = FixtureDisc(trackSeconds: [4], faults: .init(failFirst: [20: 2]))
+        var reader = SectorReader(disc: disc, verify: false)
+        #expect(try reader.read(start: 10, count: 26) == Self.expected(10, 26))
+        #expect(reader.issues.isClean)
+        #expect(reader.issues.retries == 2)
+    }
+
+    @Test func retriesAreLimited() throws {
+        let disc = FixtureDisc(trackSeconds: [4], faults: .init(failFirst: [20: 1_000]))
+        var reader = SectorReader(disc: disc, verify: false, maxRetries: 3)
+        _ = try reader.read(start: 10, count: 26)
+        // 4 tries at the chunk, then 4 tries at sector 20 alone.
+        #expect(reader.issues.retries == 6)
+        #expect(reader.issues.unreadable == [20])
+    }
+
+    @Test func anUnreadableSectorBecomesSilenceAndTheRestSurvives() throws {
+        let disc = FixtureDisc(trackSeconds: [4], badSectors: [20])
+        var reader = SectorReader(disc: disc)
+        let data = try reader.read(start: 10, count: 26)
+        let good = try Self.expected(10, 26)
+        let bytes = SectorReader.sectorBytes
+        #expect(data.count == good.count)
+        #expect(data[(20 - 10) * bytes ..< (21 - 10) * bytes] == Data(count: bytes), "silence in the bad sector")
+        #expect(data[0 ..< (20 - 10) * bytes] == good[0 ..< (20 - 10) * bytes])
+        #expect(data[(21 - 10) * bytes ..< data.count] == good[(21 - 10) * bytes ..< good.count])
+        #expect(reader.issues.unreadable == [20])
+        #expect(reader.issues.suspect.isEmpty)
+    }
+
+    @Test func aReadThatReturnsWrongDataWithoutAnErrorIsCaughtAndRepaired() throws {
+        let disc = FixtureDisc(trackSeconds: [4], faults: .init(corruptFirst: [20: 1]))
+        var reader = SectorReader(disc: disc, verify: true)
+        #expect(try reader.read(start: 10, count: 26) == Self.expected(10, 26))
+        #expect(reader.issues.isClean)
+    }
+
+    @Test func withoutCheckingWrongDataGetsThrough() throws {
+        let disc = FixtureDisc(trackSeconds: [4], faults: .init(corruptFirst: [20: 1]))
+        var reader = SectorReader(disc: disc, verify: false)
+        #expect(try reader.read(start: 10, count: 26) != Self.expected(10, 26))
+    }
+
+    @Test func readsThatNeverAgreeAreMarkedSuspect() throws {
+        let disc = FixtureDisc(trackSeconds: [4], faults: .init(corruptFirst: [20: 1_000]))
+        var reader = SectorReader(disc: disc, verify: true)
+        let data = try reader.read(start: 10, count: 26)
+        #expect(reader.issues.suspect == [20])
+        #expect(reader.issues.unreadable.isEmpty)
+        #expect(data.count == 26 * SectorReader.sectorBytes)
+    }
+
+    @Test func checkingReadsEverythingMoreThanOnce() throws {
+        // 40 seconds is 3,000 sectors, more than the 2,000-sector hop that clears the drive's cache.
+        let plain = FixtureDisc(trackSeconds: [40])
+        var one = SectorReader(disc: plain, verify: false)
+        _ = try one.read(start: 0, count: 26)
+        let checked = FixtureDisc(trackSeconds: [40])
+        var two = SectorReader(disc: checked, verify: true)
+        _ = try two.read(start: 0, count: 26)
+        #expect(plain.faults.reads == 1)
+        #expect(checked.faults.reads == 3, "two reads and a cache-clearing read: \(checked.faults.reads)")
+    }
+
+    @Test func aShortDiscSkipsTheCacheClearingRead() throws {
+        let disc = FixtureDisc(trackSeconds: [4])
+        var reader = SectorReader(disc: disc, verify: true)
+        _ = try reader.read(start: 0, count: 26)
+        #expect(disc.faults.reads == 2)
+    }
+
+    @Test func aRangeOutsideTheDiscThrows() {
+        var reader = SectorReader(disc: FixtureDisc(trackSeconds: [1]))
+        #expect(throws: DiscError.outOfRange) { _ = try reader.read(start: 70, count: 26) }
     }
 }
 
