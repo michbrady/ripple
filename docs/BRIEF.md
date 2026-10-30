@@ -1,5 +1,7 @@
 # Ripple
 
+A BradysBit app. The name stays Ripple; BradysBit is the brand that makes it (About window, copyright line).
+
 A one-window Mac app that rips an audio CD to MP3 or M4A files, looks up the album details for you, names every file after its song title, and burns MP3 files back to a CD.
 
 Choices below were decided by the agent from `docs/research/cd-ripper.md`, because the user gave only the idea. Bundle id: `com.michael.ripple`. Change either in one line.

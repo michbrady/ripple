@@ -26,6 +26,9 @@ struct RippleApp: App {
         .defaultSize(width: 760, height: 560)
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About Ripple") { AboutPanel.show() }
+            }
             CommandGroup(replacing: .newItem) {
                 Button("Rip Checked Tracks") { model.rip() }
                     .keyboardShortcut("r")
@@ -86,5 +89,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 enum Store {
     static var isOverridden: Bool {
         !(ProcessInfo.processInfo.environment["APP_STORE"] ?? "").isEmpty
+    }
+}
+
+/// The About window: the BradysBit brand, and the credits the open-source parts ask for.
+enum AboutPanel {
+    static func show() {
+        let credits = NSMutableAttributedString()
+        let body: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.labelColor]
+        let bold: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: 11), .foregroundColor: NSColor.labelColor]
+        credits.append(NSAttributedString(string: "A BradysBit app\n\n", attributes: bold))
+        credits.append(NSAttributedString(string: """
+            MP3 encoding by LAME 3.100, used under the GNU LGPL (lame.sourceforge.io). \
+            Album details from MusicBrainz. Cover pictures from the Cover Art Archive and the iTunes Search API.
+            """, attributes: body))
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+        NSApp.activate()
     }
 }

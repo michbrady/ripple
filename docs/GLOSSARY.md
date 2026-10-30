@@ -20,3 +20,4 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | Show in Finder | Reveal the finished album folder | Open folder, Reveal |
 | Eject | Push the disc out of the drive | Remove, Unmount |
 | Cancel | Stop a rip or a burn before it finishes | Abort, Stop |
+| BradysBit | The brand that makes Ripple. Shown in the About window and the copyright line, not in the window title | publisher, company |
