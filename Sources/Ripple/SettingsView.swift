@@ -54,11 +54,16 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 }
 
 struct GeneralSettings: View {
-    @AppStorage("confirmDelete") private var confirmDelete = true
+    @Environment(AppModel.self) private var model
 
     var body: some View {
-        Section("Items") {
-            Toggle("Ask before deleting items", isOn: $confirmDelete)
+        Section("Rip") {
+            LabeledContent("Output Folder") {
+                HStack {
+                    Text(model.outputFolder.lastPathComponent).lineLimit(1).help(model.outputFolder.path)
+                    Button("Change…") { model.chooseFolder() }
+                }
+            }
         }
     }
 }

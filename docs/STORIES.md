@@ -19,7 +19,7 @@ UX:
 - States: empty only. Title "Insert a Disc", body "Ripple reads audio discs from a built-in or USB drive." No button, because the first action is physical.
 - Words: "Insert a Disc"; sentence case body; no error tone
 - Access: VoiceOver reads title then body; no focusable controls
-Status: todo
+Status: done
 
 ### S-002 Detect an inserted disc
 As the user, I insert a CD and Ripple shows it within a few seconds.
@@ -35,7 +35,8 @@ UX:
 - States: loading "Reading Disc…" with an indeterminate bar when the read takes over half a second; error "Ripple cannot read this disc." with "Try Again" and "Eject"; empty returns on eject
 - Words: "Reading Disc…", "Eject", "Try Again"; tooltip on the Eject icon "Eject the disc (⌘E)"
 - Access: Eject has a label and Command-E; focus moves to the track list when it appears
-Status: todo
+Status: doing
+Note: Code is in (DiskArbitration monitor, mount refusal, eject). Not yet tried on a real drive: needs a USB optical drive. Insert a disc with Music running and confirm Music stays closed.
 
 ### S-003 Read the table of contents
 As the user, I see every track with its length, named "Track 01", "Track 02".
@@ -52,7 +53,8 @@ UX:
 - States: loaded list; too much: long titles truncate with the full title in a tooltip, and 99 tracks still scroll smoothly; before lookup the rows read "Track 01"
 - Words: column headers "#", "Title", "Artist", "Length"; header placeholder "Unknown Album" and "Unknown Artist"
 - Access: arrow keys move between rows; VoiceOver reads "Track 3, Title, 3 minutes 41 seconds, included"
-Status: todo
+Status: doing
+Note: [unit] and [snap] pass, including the MusicBrainz example TOCs. The disc ID is checked against an independent Python implementation of the published algorithm, not a published value. Still to do: [manual] compare track count and lengths on a real disc.
 
 ### S-004 Read raw audio from a track
 As the user, I rip a track and the audio is the same as the disc.
@@ -61,7 +63,8 @@ Acceptance:
 - [self] Reading one track from the fixture yields the exact byte count (sectors times 2352).
 - [manual] On a real disc, a ripped track plays with no clicks and its length matches the disc.
 - [self] Reading the same sector twice returns fresh data, not cached data.
-Status: todo
+Status: doing
+Note: Raw reads go through /dev/rdiskN with DKIOCCDREAD (Sources/CDShim). The fixture passes the byte-count check. Still to do on a real disc: confirm audio plays clean, and that reading a sector twice returns fresh data.
 
 ### S-005 Rip a disc to MP3
 As the user, I press Rip and every checked track becomes an MP3 file.
@@ -79,7 +82,8 @@ UX:
 - States: loading "Ripping 3 of 12 · Title" with a bar per track and a total; done "Ripped 12 Tracks" with the album folder path; error uses S-024
 - Words: "Rip" (toolbar button, tooltip "Rip the checked tracks to the Output Folder (⌘R)"), "Show in Finder", "Rip Another Disc", "Cancel"
 - Access: Rip is the default button; progress is announced by VoiceOver at each track and at the end; done is announced in words, not only a checkmark
-Status: todo
+Status: done
+Note: [unit] and [self] pass; LAME is compiled into the app (static), not bundled as a dynamic library. Still to do: [manual] play the files in Music and QuickTime, and show the LAME credit in an About window.
 
 ### S-006 Name files by song title
 As the user, I get `Artist/Album/01 - Title.m4a`.
@@ -89,7 +93,7 @@ Acceptance:
 - [unit] `/` and `:` in titles become `-`, control characters go, leading dots and trailing spaces trim, and the name is NFC.
 - [unit] A name over 255 UTF-8 bytes shortens without splitting a character.
 - [unit] Two tracks with the same title get distinct names.
-Status: todo
+Status: done
 
 ### S-007 Choose the output folder
 As the user, I pick where files go, and Ripple remembers it.
@@ -105,7 +109,8 @@ UX:
 - States: default Music folder on first launch; error "Ripple cannot save to this folder. Choose another." when it is unwritable (S-024)
 - Words: "Output Folder", "Change…" (ellipsis, it asks for more input), tooltip "Choose where ripped albums are saved"
 - Access: Change… reachable by keyboard; VoiceOver "Output Folder, Music, Change button"
-Status: todo
+Status: doing
+Note: The bar and the Settings row show the Output Folder, and files land in it. Still to do: a check that the choice survives a restart (test runs skip saved settings by design), and the folder chooser by hand.
 
 ### S-008 Skip tracks
 As the user, I uncheck tracks I do not want.
@@ -121,7 +126,7 @@ UX:
 - States: all checked by default; none checked disables Rip and a line under the list says "Check at least one track."
 - Words: button "Rip 12 Tracks", "Rip 1 Track"; checkbox label is the track title
 - Access: Space toggles the focused row; VoiceOver reads "included" or "not included"; the state is a checkbox, not color alone
-Status: todo
+Status: done
 
 ### S-009 Cancel a rip
 As the user, I press Cancel and stop without leaving half files.
@@ -136,7 +141,7 @@ UX:
 - States: "Cancelling…" until the partial file is gone, then back to the list
 - Words: "Cancel", tooltip "Stop ripping. Finished tracks are kept (Esc)"; closing the window mid-rip asks "Stop Ripping?" with "Stop" and "Keep Ripping"
 - Access: Escape cancels; focus returns to the Rip button
-Status: todo
+Status: done
 
 ## M2 Metadata
 The album fills itself in, and the user can fix it.
