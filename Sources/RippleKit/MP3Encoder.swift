@@ -5,7 +5,7 @@ import Foundation
 /// Write `encode` output to the file as it comes, then `finish`, then write the
 /// returned tag frame over the start of the file so players know the length.
 public final class MP3Encoder {
-    public enum Quality: Equatable, Sendable {
+    public enum Quality: Hashable, Sendable {
         /// 0 is best and largest, 9 is smallest. 2 sounds transparent for most people.
         case vbr(Int)
         /// A fixed rate in kilobits per second.
@@ -13,6 +13,9 @@ public final class MP3Encoder {
     }
 
     public enum EncoderError: Error { case setupFailed, encodeFailed(Int32) }
+
+    /// The choices Settings offers, best first.
+    public static let choices: [Quality] = [.vbr(0), .vbr(2), .vbr(4), .vbr(6), .cbr(128), .cbr(192), .cbr(256), .cbr(320)]
 
     private let flags: lame_t
 
@@ -54,5 +57,37 @@ public final class MP3Encoder {
         var tag = [UInt8](repeating: 0, count: 4_096)
         let tagSize = lame_get_lametag_frame(flags, &tag, tag.count)
         return (Data(out[0..<Int(written)]), Data(tag[0..<min(tagSize, tag.count)]))
+    }
+}
+
+extension MP3Encoder.Quality {
+    /// Words for Settings.
+    public var label: String {
+        switch self {
+        case .vbr(0): "Best (variable, about 245 kbps)"
+        case .vbr(2): "High (variable, about 190 kbps)"
+        case .vbr(4): "Standard (variable, about 165 kbps)"
+        case .vbr(6): "Smaller (variable, about 130 kbps)"
+        case .vbr(let level): "Variable, level \(level)"
+        case .cbr(let kbps): "Fixed \(kbps) kbps"
+        }
+    }
+
+    /// For saving: "vbr:2" or "cbr:192".
+    public var rawValue: String {
+        switch self {
+        case .vbr(let level): "vbr:\(level)"
+        case .cbr(let kbps): "cbr:\(kbps)"
+        }
+    }
+
+    public init?(rawValue: String) {
+        let parts = rawValue.split(separator: ":")
+        guard parts.count == 2, let number = Int(parts[1]) else { return nil }
+        switch parts[0] {
+        case "vbr": self = .vbr(number)
+        case "cbr": self = .cbr(number)
+        default: return nil
+        }
     }
 }

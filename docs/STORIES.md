@@ -109,8 +109,8 @@ UX:
 - States: default Music folder on first launch; error "Ripple cannot save to this folder. Choose another." when it is unwritable (S-024)
 - Words: "Output Folder", "Change…" (ellipsis, it asks for more input), tooltip "Choose where ripped albums are saved"
 - Access: Change… reachable by keyboard; VoiceOver "Output Folder, Music, Change button"
-Status: doing
-Note: The bar and the Settings row show the Output Folder, and files land in it. Still to do: a check that the choice survives a restart (test runs skip saved settings by design), and the folder chooser by hand.
+Status: done
+Note: The restart check now runs: a second AppModel on the same settings store reads back the folder. Try the folder chooser by hand once.
 
 ### S-008 Skip tracks
 As the user, I uncheck tracks I do not want.
@@ -225,7 +225,7 @@ Acceptance:
 - [self] The choice survives a restart.
 - [self] A fresh install defaults to MP3, because MP3 is what the user asked to rip to.
 - [self] The file extension matches the chosen format.
-Status: todo
+Status: done
 
 ### S-017 Rip to M4A
 As the user, I choose M4A and get AAC files that play in Music and on iPhone.
@@ -234,7 +234,8 @@ Depends: S-016
 Acceptance:
 - [unit] The encoder turns a PCM fixture into an `.m4a` that AVAudioFile opens with the right duration.
 - [manual] The M4A files play in Music and QuickTime.
-Status: todo
+Status: done
+Note: M4A is AAC at 256 kbps written through Core Audio; the file decodes to the right length. Still to do: play one in Music and on an iPhone.
 
 ### S-018 Choose MP3 quality
 As the user, I pick VBR (default) or a fixed bitrate for MP3.
@@ -243,7 +244,8 @@ Depends: S-005
 Acceptance:
 - [snap] Settings shows VBR with a quality level, and CBR with 128, 192, 256, and 320 kbps.
 - [unit] A CBR 192 encode of a fixture reports 192 kbps.
-Status: todo
+Status: done
+Note: Settings shows four variable levels and four fixed rates. M4A has no quality setting yet.
 
 ### S-019 Write tags
 As the user, my files carry title, artist, album, year, track and disc number, and cover art.

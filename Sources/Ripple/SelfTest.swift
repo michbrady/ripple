@@ -80,10 +80,65 @@ enum SelfTest {
             check("Cancel returns to the track list", model.phase == .ready)
 
             await lookupChecks(model: model, out: out)
+            await formatChecks(model: model, out: out)
 
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }
+    }
+
+    /// S-007, S-016 to S-018: Output Folder, format, and quality are saved and used.
+    private static func formatChecks(model: AppModel, out: URL) async {
+        let fm = FileManager.default
+
+        // A fresh settings store starts with MP3 and the Music folder.
+        let suite = "com.michael.ripple.selftest-settings"
+        UserDefaults().removePersistentDomain(forName: suite)
+        let defaults = UserDefaults(suiteName: suite)!
+        let fresh = AppModel(defaults: defaults)
+        check("a fresh install defaults to MP3 with variable quality", fresh.format == .mp3 && fresh.mp3Quality == .vbr(2))
+
+        // A new AppModel on the same store is a restart.
+        fresh.format = .m4a
+        fresh.mp3Quality = .cbr(192)
+        fresh.outputFolder = out
+        let restarted = AppModel(defaults: defaults)
+        check("the format survives a restart", restarted.format == .m4a)
+        check("the MP3 quality survives a restart", restarted.mp3Quality == .cbr(192))
+        check("the Output Folder survives a restart", restarted.outputFolder == out)
+        defaults.set("nonsense", forKey: "format")
+        defaults.set("nonsense", forKey: "mp3.quality")
+        let damaged = AppModel(defaults: defaults)
+        check("unreadable saved settings fall back to the defaults", damaged.format == .mp3 && damaged.mp3Quality == .vbr(2))
+        UserDefaults().removePersistentDomain(forName: suite)
+        AppModel.current = model
+
+        // The chosen format decides the file extension.
+        model.eject()
+        model.lookup = FixtureLookup(mode: .none)
+        model.format = .m4a
+        model.setAlbumArtist("Format Test")
+        model.setAlbumTitle("M4A")
+        model.load(FixtureDisc(trackSeconds: [1, 1]), bsdName: nil)
+        model.setAlbumArtist("Format Test")
+        model.setAlbumTitle("M4A")
+        model.rip()
+        await wait(until: { !model.isRipping })
+        let m4a = ((try? fm.contentsOfDirectory(atPath: out.appending(path: "Format Test/M4A").path)) ?? []).sorted()
+        check("M4A makes .m4a files", m4a == ["01 - Track 01.m4a", "02 - Track 02.m4a"], "\(m4a)")
+
+        model.eject()
+        model.format = .mp3
+        model.mp3Quality = .cbr(320)
+        model.load(FixtureDisc(trackSeconds: [4]), bsdName: nil)
+        model.setAlbumArtist("Format Test")
+        model.setAlbumTitle("MP3 320")
+        model.rip()
+        await wait(until: { !model.isRipping })
+        let file = out.appending(path: "Format Test/MP3 320/01 - Track 01.mp3")
+        let size = (try? fm.attributesOfItem(atPath: file.path)[.size] as? Int) ?? 0
+        check("the MP3 quality setting reaches the encoder", abs(size - 160_000) < 12_000, "\(size) bytes")
+        model.eject()
     }
 
     /// S-010 to S-015: the album lookup, matches, edits, cover, multi-disc, compilations.

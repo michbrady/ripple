@@ -24,6 +24,7 @@ public struct RipRequest: Sendable {
     /// The Output Folder. Files land in `Artist/Album/` inside it.
     public var folder: URL
     public var quality: MP3Encoder.Quality
+    public var format: RipFormat
     /// Which disc of a set this is. Sets of two or more discs get a `Disc N` folder.
     public var discNumber: Int
     public var discCount: Int
@@ -31,8 +32,9 @@ public struct RipRequest: Sendable {
     public var isCompilation: Bool
 
     public init(disc: any AudioDisc, tracks: [RipTrack], albumArtist: String, album: String,
-                folder: URL, quality: MP3Encoder.Quality = .vbr(2),
+                folder: URL, quality: MP3Encoder.Quality = .vbr(2), format: RipFormat = .mp3,
                 discNumber: Int = 1, discCount: Int = 1, isCompilation: Bool = false) {
+        self.format = format
         self.discNumber = discNumber
         self.discCount = discCount
         self.isCompilation = isCompilation
@@ -52,7 +54,7 @@ public enum RipEvent: Sendable, Equatable {
     case finished(track: Int, file: URL)
 }
 
-/// Copies tracks from a disc to MP3 files.
+/// Copies tracks from a disc to MP3 or M4A files.
 public enum Ripper {
     /// Sectors per read: about a third of a second of sound.
     static let chunkSectors = 26
@@ -60,7 +62,7 @@ public enum Ripper {
     /// Rips every included audio track. Run it off the main thread inside a Task:
     /// it checks for cancellation between reads. On cancel or error the track in
     /// progress is deleted and finished tracks stay.
-    public static func rip(_ request: RipRequest, onEvent: @Sendable (RipEvent) -> Void) throws -> [URL] {
+    public static func rip(_ request: RipRequest, onEvent: @Sendable (RipEvent) -> Void) async throws -> [URL] {
         let toc = request.disc.toc
         let fm = FileManager.default
         var albumDir = request.folder
@@ -80,13 +82,13 @@ public enum Ripper {
             if Task.isCancelled { throw CancellationError() }
             let track = request.tracks[index]
             let name = FileNamer.unique(
-                FileNamer.trackFileName(number: entry.number, title: track.title, fileExtension: "mp3",
+                FileNamer.trackFileName(number: entry.number, title: track.title, fileExtension: request.format.fileExtension,
                                         trackCount: toc.trackCount, artist: request.isCompilation ? track.artist : nil),
                 taken: taken)
             taken.insert(name)
             onEvent(.started(track: index))
             let file = albumDir.appending(path: name)
-            try ripTrack(index: index, request: request, to: file, onEvent: onEvent)
+            try await ripTrack(index: index, request: request, to: file, onEvent: onEvent)
             files.append(file)
             onEvent(.finished(track: index, file: file))
         }
@@ -94,35 +96,28 @@ public enum Ripper {
     }
 
     private static func ripTrack(index: Int, request: RipRequest, to file: URL,
-                                 onEvent: @Sendable (RipEvent) -> Void) throws {
+                                 onEvent: @Sendable (RipEvent) -> Void) async throws {
         let fm = FileManager.default
-        let partial = file.deletingLastPathComponent().appending(path: ".ripple-\(UUID().uuidString).partial")
-        guard fm.createFile(atPath: partial.path, contents: nil) else {
-            throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: partial.path])
-        }
+        let ext = request.format.fileExtension
+        let partial = file.deletingLastPathComponent().appending(path: ".ripple-\(UUID().uuidString).partial.\(ext)")
         var succeeded = false
         defer { if !succeeded { try? fm.removeItem(at: partial) } }
 
-        let handle = try FileHandle(forWritingTo: partial)
-        defer { try? handle.close() }
-        let encoder = try MP3Encoder(quality: request.quality)
+        let writer: any TrackWriter
+        switch request.format {
+        case .mp3: writer = try MP3TrackWriter(url: partial, quality: request.quality)
+        case .m4a: writer = try M4ATrackWriter(url: partial)
+        }
         let sectors = request.disc.toc.sectors(ofTrack: index)
         var position = sectors.lowerBound
         while position < sectors.upperBound {
             if Task.isCancelled { throw CancellationError() }
             let count = min(chunkSectors, sectors.upperBound - position)
-            let pcm = try request.disc.readSectors(start: position, count: count)
-            try handle.write(contentsOf: try encoder.encode(pcm))
+            try writer.write(try request.disc.readSectors(start: position, count: count))
             position += count
             onEvent(.progress(track: index, fraction: Double(position - sectors.lowerBound) / Double(max(1, sectors.count))))
         }
-        let (tail, tag) = try encoder.finish()
-        try handle.write(contentsOf: tail)
-        if !tag.isEmpty {
-            try handle.seek(toOffset: 0)
-            try handle.write(contentsOf: tag)
-        }
-        try handle.close()
+        try await writer.finish()
         try fm.moveItem(at: partial, to: file)
         succeeded = true
     }

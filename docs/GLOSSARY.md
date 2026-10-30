@@ -13,6 +13,7 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | MP3 Disc | A burned disc holding the MP3 files unchanged | data CD, MP3 CD |
 | Source Folder | The Mac folder whose MP3 files get burned | input folder, library |
 | Format | MP3 or M4A, the kind of file a rip makes | codec, encoder, type |
+| Quality | How much detail an MP3 keeps: variable (default) or a fixed rate | bitrate, preset |
 | Output Folder | Where ripped albums are saved | destination, library |
 | Match | An album the lookup found for a disc | result, release (in the picker the row says release details) |
 | Cover | The album's picture | art, artwork, image |

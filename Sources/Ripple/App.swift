@@ -85,11 +85,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Ripple saves only settings. APP_STORE (any value) means a test or snapshot run: it never reads or writes them.
+/// Ripple saves only settings. APP_STORE (any value) means a test or snapshot run: it uses a separate
+/// settings store, so it never reads or writes your real ones.
 enum Store {
     static var isOverridden: Bool {
         !(ProcessInfo.processInfo.environment["APP_STORE"] ?? "").isEmpty
     }
+
+    /// A test or snapshot run starts from an empty store every time, so one run never leaks into the next.
+    static let defaults: UserDefaults = {
+        guard isOverridden, let suite = UserDefaults(suiteName: "com.michael.ripple.test") else { return .standard }
+        suite.removePersistentDomain(forName: "com.michael.ripple.test")
+        return suite
+    }()
 }
 
 /// The About window: the BradysBit brand, and the credits the open-source parts ask for.

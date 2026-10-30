@@ -293,13 +293,21 @@ struct BottomBar: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        HStack(spacing: Space.md) {
+        @Bindable var model = model
+        return HStack(spacing: Space.md) {
             Text("Output Folder:").foregroundStyle(.secondary)
             Text(model.outputFolder.lastPathComponent).lineLimit(1)
                 .help(model.outputFolder.path)
             Button("Change…") { model.chooseFolder() }
                 .disabled(model.isRipping)
                 .help("Choose where ripped albums are saved")
+            Picker("Format", selection: $model.format) {
+                ForEach(RipFormat.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .disabled(model.isRipping)
+            .help("Choose MP3 or M4A for the ripped files")
             Spacer()
             action
         }

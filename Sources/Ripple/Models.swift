@@ -36,18 +36,23 @@ final class AppModel {
     var isPickingMatch = false
     var coverImage: NSImage?
     var isCancelling = false
-    /// Settings reopens on the last tab. Test and snapshot runs leave it alone.
-    var settingsTab: SettingsTab = SettingsTab(rawValue: UserDefaults.standard.string(forKey: "settings.tab") ?? "") ?? .general {
-        didSet { if !Store.isOverridden { UserDefaults.standard.set(settingsTab.rawValue, forKey: "settings.tab") } }
+    /// Settings reopens on the last tab.
+    var settingsTab: SettingsTab = .general {
+        didSet { defaults.set(settingsTab.rawValue, forKey: "settings.tab") }
     }
-    var outputFolder: URL = {
-        if !Store.isOverridden, let path = UserDefaults.standard.string(forKey: "outputFolder") {
-            return URL(fileURLWithPath: path, isDirectory: true)
-        }
-        return URL.musicDirectory
-    }() {
-        didSet { if !Store.isOverridden { UserDefaults.standard.set(outputFolder.path, forKey: "outputFolder") } }
+    var outputFolder: URL = URL.musicDirectory {
+        didSet { defaults.set(outputFolder.path, forKey: "outputFolder") }
     }
+    /// MP3 or M4A. MP3 unless the user chooses otherwise.
+    var format: RipFormat = .mp3 {
+        didSet { defaults.set(format.rawValue, forKey: "format") }
+    }
+    var mp3Quality: MP3Encoder.Quality = .vbr(2) {
+        didSet { defaults.set(mp3Quality.rawValue, forKey: "mp3.quality") }
+    }
+
+    /// Saved settings live here. Test and snapshot runs get their own store, never the real one.
+    let defaults: UserDefaults
 
     private(set) var disc: (any AudioDisc)?
     private var bsdName: String?
@@ -58,8 +63,14 @@ final class AppModel {
     private var ripWork: Task<[URL], Error>?
     private var ripFinished: Task<Void, Never>?
 
-    init() {
+    init(defaults: UserDefaults = Store.defaults) {
+        self.defaults = defaults
         Self.current = self
+        // Setting properties inside init does not save them again.
+        settingsTab = SettingsTab(rawValue: defaults.string(forKey: "settings.tab") ?? "") ?? .general
+        if let path = defaults.string(forKey: "outputFolder") { outputFolder = URL(fileURLWithPath: path, isDirectory: true) }
+        format = RipFormat(rawValue: defaults.string(forKey: "format") ?? "") ?? .mp3
+        mp3Quality = MP3Encoder.Quality(rawValue: defaults.string(forKey: "mp3.quality") ?? "") ?? .vbr(2)
     }
 
     // MARK: Disc
@@ -246,13 +257,13 @@ final class AppModel {
             return RipTrack(number: row.number, title: row.title, artist: row.artist, include: row.include)
         }
         let request = RipRequest(disc: disc, tracks: tracks, albumArtist: albumArtist, album: albumTitle,
-                                 folder: outputFolder, quality: .vbr(2),
+                                 folder: outputFolder, quality: mp3Quality, format: format,
                                  discNumber: discNumber, discCount: discCount, isCompilation: isCompilation)
         for index in rows.indices { rows[index].status = .waiting }
         isCancelling = false
         phase = .ripping
         let work = Task.detached(priority: .userInitiated) { [weak self] in
-            try Ripper.rip(request) { event in
+            try await Ripper.rip(request) { event in
                 Task { @MainActor in self?.handle(event) }
             }
         }

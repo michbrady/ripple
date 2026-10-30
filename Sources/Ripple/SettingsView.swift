@@ -1,3 +1,4 @@
+import RippleKit
 import SwiftUI
 
 /// The Settings window (Command-Comma). One tab per topic, at most about
@@ -57,6 +58,7 @@ struct GeneralSettings: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        @Bindable var model = model
         Section("Rip") {
             LabeledContent("Output Folder") {
                 HStack {
@@ -64,6 +66,15 @@ struct GeneralSettings: View {
                     Button("Change…") { model.chooseFolder() }
                 }
             }
+            Picker("Format", selection: $model.format) {
+                ForEach(RipFormat.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            Picker("MP3 Quality", selection: $model.mp3Quality) {
+                ForEach(MP3Encoder.choices, id: \.self) { Text($0.label).tag($0) }
+            }
+            .disabled(model.format != .mp3)
+            Text("M4A files use AAC at 256 kbps.").font(.callout).foregroundStyle(.secondary)
         }
     }
 }
