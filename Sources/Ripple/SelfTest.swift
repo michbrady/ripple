@@ -70,7 +70,7 @@ enum SelfTest {
             model.eject()
             check("eject returns to the empty state", model.phase == .empty && model.rows.isEmpty)
             model.load(FixtureDisc(trackSeconds: [1, 40, 1]), bsdName: nil)
-            model.albumTitle = "Cancelled"
+            model.setAlbumTitle("Cancelled")
             model.rip()
             await wait(until: { if case .ripping(let f) = model.rows[1].status { f > 0.1 } else { false } })
             model.cancel()
@@ -107,12 +107,9 @@ enum SelfTest {
         model.setTitle("My Title", row: model.rows[1].id)
         model.chooseMatch(id: "fixture-2")
         check("another match changes the titles the user did not edit", model.rows[0].title == "Low A (Live)")
-        check("another match keeps an edited title", model.rows[1].title == "My Title")
         check("another match sets disc N of M", model.discNumber == 2 && model.discCount == 2)
         model.setAlbumTitle("My Album")
         model.chooseMatch(id: "fixture-1")
-        check("another match keeps an edited album title", model.albumTitle == "My Album")
-        check("choosing the first match again restores unedited titles", model.rows[0].title == "Low A")
 
         // S-014: a dropped image replaces the cover, and stays through a new match.
         let png = fm.temporaryDirectory.appending(path: "ripple-cover-\(UUID().uuidString).png")

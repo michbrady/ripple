@@ -1,4 +1,5 @@
 import AppKit
+import RippleKit
 import SwiftUI
 
 struct ContentView: View {

@@ -3,27 +3,6 @@ import Foundation
 import Observation
 import RippleKit
 
-/// One track on screen.
-struct TrackRow: Identifiable, Equatable {
-    enum Status: Equatable {
-        case waiting
-        case ripping(Double)
-        case done
-    }
-
-    /// The index in the disc's table of contents.
-    var id: Int
-    var number: Int
-    var title: String
-    var artist: String
-    var seconds: Double
-    var include = true
-    var status: Status = .waiting
-    /// A title or artist the user typed stays when another match is chosen.
-    var titleEdited = false
-    var artistEdited = false
-}
-
 /// The pages snapshot mode visits.
 enum SnapshotPage: String, CaseIterable {
     case empty, tracks, unmatched, picker, ripping, done
@@ -50,15 +29,9 @@ final class AppModel {
     static weak var current: AppModel?
 
     var phase: Phase = .empty
-    var rows: [TrackRow] = []
-    /// Empty until a lookup or the user fills them in; the file names then use "Unknown Album" and "Unknown Artist".
-    var albumTitle = ""
-    var albumArtist = ""
-    var albumYear = ""
-    var discNumber = 1
-    var discCount = 1
+    /// The album as shown: what the lookup found merged with what the user typed (RippleKit/AlbumDraft.swift).
+    var album = AlbumDraft()
     var matches: [AlbumMatch] = []
-    var selectedMatchID: String?
     var lookupState: LookupState = .idle
     var isPickingMatch = false
     var coverImage: NSImage?
@@ -80,8 +53,6 @@ final class AppModel {
     private var bsdName: String?
     var lookup: any AlbumLookup = LiveLookup()
     private var lookupTask: Task<Void, Never>?
-    private var albumTitleEdited = false
-    private var albumArtistEdited = false
     private var customCover = false
     private let monitor = DiscMonitor()
     private var ripWork: Task<[URL], Error>?
@@ -102,7 +73,17 @@ final class AppModel {
         hasDisc && !albumTitle.isEmpty ? albumTitle : "Ripple"
     }
 
-    var isCompilation: Bool { albumArtist == "Various Artists" }
+    var isCompilation: Bool { album.isCompilation }
+    var rows: [TrackRow] {
+        get { album.tracks }
+        set { album.tracks = newValue }
+    }
+    var albumTitle: String { album.title }
+    var albumArtist: String { album.artist }
+    var albumYear: String { album.year }
+    var discNumber: Int { album.discNumber }
+    var discCount: Int { album.discCount }
+    var selectedMatchID: String? { album.selectedMatchID }
 
     /// Starts watching for discs. APP_FIXTURE_DISC=1 loads a made-up disc instead.
     func start() {
@@ -175,18 +156,11 @@ final class AppModel {
 
     private func resetAlbum() {
         lookupTask?.cancel()
-        albumTitle = ""
-        albumArtist = ""
-        albumYear = ""
-        discNumber = 1
-        discCount = 1
+        album = AlbumDraft()
         matches = []
-        selectedMatchID = nil
         lookupState = .idle
         isPickingMatch = false
         coverImage = nil
-        albumTitleEdited = false
-        albumArtistEdited = false
         customCover = false
     }
 
@@ -215,19 +189,9 @@ final class AppModel {
         }
     }
 
-    /// Fills the album and track titles from a match. Anything the user typed stays.
+    /// Fills the album and track titles from a match, and fetches its cover. Anything the user typed stays.
     func apply(_ match: AlbumMatch) {
-        selectedMatchID = match.id
-        if !albumTitleEdited { albumTitle = match.title }
-        if !albumArtistEdited { albumArtist = match.artist }
-        albumYear = match.year
-        discNumber = match.discNumber
-        discCount = match.discCount
-        for index in rows.indices {
-            guard let track = match.tracks.first(where: { $0.number == rows[index].number }) else { continue }
-            if !rows[index].titleEdited { rows[index].title = track.title }
-            if !rows[index].artistEdited { rows[index].artist = track.artist }
-        }
+        album.apply(match)
         if !customCover {
             let source = lookup
             Task {
@@ -244,23 +208,10 @@ final class AppModel {
 
     // MARK: Edits
 
-    func setAlbumTitle(_ text: String) {
-        albumTitle = text
-        albumTitleEdited = true
-    }
-
-    func setAlbumArtist(_ text: String) {
-        albumArtist = text
-        albumArtistEdited = true
-    }
-
-    func setTitle(_ text: String, row id: Int) {
-        update(id) { $0.title = text; $0.titleEdited = true }
-    }
-
-    func setArtist(_ text: String, row id: Int) {
-        update(id) { $0.artist = text; $0.artistEdited = true }
-    }
+    func setAlbumTitle(_ text: String) { album.setTitle(text) }
+    func setAlbumArtist(_ text: String) { album.setArtist(text) }
+    func setTitle(_ text: String, row id: Int) { album.setTrackTitle(text, id: id) }
+    func setArtist(_ text: String, row id: Int) { album.setTrackArtist(text, id: id) }
 
     /// Uses a picture from a file as the Cover. Returns false when the file is not an image.
     @discardableResult
@@ -379,11 +330,10 @@ final class AppModel {
         for index in rows.indices { rows[index].status = .waiting }
         phase = .ready
         if page == .unmatched {
-            resetAlbum()
-            for index in rows.indices {
-                rows[index].title = String(format: "Track %02d", rows[index].number)
-                rows[index].artist = ""
-            }
+            album.clearDetails()
+            matches = []
+            coverImage = nil
+            customCover = false
             lookupState = .notFound
             return
         }
