@@ -216,3 +216,44 @@ import Testing
         #expect(BurnError.discRejected("x").errorDescription?.contains("rejected") == true)
     }
 }
+
+@Suite struct BurnNamingTests {
+    static func name(_ position: Int, _ file: String, of total: Int = 3) -> String {
+        BurnNaming.discFileName(position: position, of: total, original: URL(fileURLWithPath: "/m/\(file)"))
+    }
+
+    @Test func aFileThatAlreadyHasANumberIsNotNumberedTwice() {
+        #expect(Self.name(1, "01 - One.mp3") == "01 - One.mp3")
+        #expect(Self.name(3, "07 - Seven.mp3") == "03 - Seven.mp3", "the list position wins")
+        #expect(Self.name(2, "7. Seven.mp3") == "02 - Seven.mp3")
+        #expect(Self.name(2, "03_Three.mp3") == "02 - Three.mp3")
+        #expect(Self.name(1, "1) One.mp3") == "01 - One.mp3")
+    }
+
+    @Test func aTitleThatBeginsWithANumberIsKept() {
+        #expect(Self.name(2, "99 Luftballons.mp3") == "02 - 99 Luftballons.mp3")
+        #expect(Self.name(1, "1979.mp3") == "01 - 1979.mp3")
+        #expect(Self.name(1, "2112.mp3") == "01 - 2112.mp3")
+    }
+
+    @Test func aFileWithNoNumberGetsOne() {
+        #expect(Self.name(1, "Song.mp3") == "01 - Song.mp3")
+        #expect(Self.name(12, "Song.MP3") == "12 - Song.MP3")
+    }
+
+    @Test func aNumberAloneFallsBackToTheWholeName() {
+        #expect(Self.name(1, "01 - .mp3") .hasPrefix("01 - "))
+        #expect(!Self.name(1, "007.mp3").isEmpty)
+    }
+
+    @Test func longNamesAreShortenedAndLargeDiscsGetThreeDigits() {
+        let long = String(repeating: "é", count: 80)
+        let name = Self.name(1, "\(long).mp3")
+        #expect(name.hasSuffix(".mp3") && name.utf8.count <= 4 + 48 + 4 + 8)
+        #expect(Self.name(5, "Song.mp3", of: 120) == "005 - Song.mp3")
+    }
+
+    @Test func slashesAndColonsAreMadeSafe() {
+        #expect(Self.name(1, "AC:DC.mp3") == "01 - AC-DC.mp3")
+    }
+}

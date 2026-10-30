@@ -89,6 +89,7 @@ enum SelfTest {
             await burnChecks(burn: burn, out: out)
             await polishChecks(model: model, out: out)
             realDriveChecks()
+            await realBurnCheck(out: out)
             coverPrepChecks()
 
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
@@ -331,6 +332,65 @@ enum SelfTest {
         model.openDisc = { try DeviceDisc(bsdName: $0) }
         model.ejectWhenDone = true
         model.eject()
+    }
+
+    /// Burns a small MP3 Disc on the real drive, then reads it back. This USES UP the blank disc, so it runs only
+    /// when RIPPLE_REAL_BURN is set to the exact phrase below.
+    private static func realBurnCheck(out: URL) async {
+        guard ProcessInfo.processInfo.environment["RIPPLE_REAL_BURN"] == "I_UNDERSTAND_THIS_USES_UP_THE_DISC" else { return }
+        let fm = FileManager.default
+        let real = DiscRecordingBurner(completion: .mount)
+        guard case .ready(let media) = real.state() else {
+            check("a blank disc is in the real drive", false, "\(real.state())")
+            return
+        }
+        print("INFO real burn: \(real.deviceName ?? "?"), blank \(media.label), \(media.blocksFree) blocks free")
+
+        // Three tagged MP3 files, eight seconds each, found the way the app finds them.
+        let source = out.appending(path: "real-burn-source", directoryHint: .isDirectory)
+        let request = RipRequest(disc: FixtureDisc(trackSeconds: [8, 8, 8]),
+                                 tracks: ["One", "Two", "Three"].enumerated().map { RipTrack(number: $0.offset + 1, title: $0.element, artist: "The Tones") },
+                                 albumArtist: "The Tones", album: "Real Burn Test", folder: source, quality: .vbr(4), verify: false)
+        _ = try? await Ripper.rip(request, onEvent: { _ in })
+        let scan = await BurnScanner.scan(source)
+        check("three MP3 files are ready to burn", scan.items.map(\.title) == ["One", "Two", "Three"], "\(scan.items.map(\.title))")
+        let job = BurnJob(type: .data, files: scan.items.map(\.url), volumeName: "RIPPLE TEST")
+
+        let lastPrinted = ProgressMemory()
+        do {
+            try await real.burn(job) { stage in
+                switch stage {
+                case .preparing: print("INFO stage: preparing")
+                case .finishing: print("INFO stage: finishing")
+                case .burning(let fraction):
+                    let step = (fraction * 10).rounded(.down) / 10
+                    if lastPrinted.changed(to: step) { print("INFO stage: burning \(Int(step * 100))%") }
+                }
+            }
+            check("the real burn finishes without an error", true)
+        } catch {
+            check("the real burn finishes without an error", false, "\(error)")
+            return
+        }
+
+        // Read the disc back: it should mount, and every file should match its source byte for byte.
+        let volume = URL(fileURLWithPath: "/Volumes/RIPPLE TEST", isDirectory: true)
+        await wait(until: { fm.fileExists(atPath: volume.path) }, seconds: 90)
+        check("the disc mounts as RIPPLE TEST", fm.fileExists(atPath: volume.path))
+        // The volume appears before its files can be listed. Wait for them.
+        await wait(until: { ((try? fm.contentsOfDirectory(atPath: volume.path)) ?? []).count >= 3 }, seconds: 60)
+        let onDisc = ((try? fm.contentsOfDirectory(atPath: volume.path)) ?? []).sorted()
+        print("INFO on the disc: \(onDisc)")
+        let wanted = ["01 - One.mp3", "02 - Two.mp3", "03 - Three.mp3"]
+        check("the disc holds the files as numbered names, in list order", onDisc == wanted, "\(onDisc)")
+        for (item, name) in zip(scan.items, wanted) {
+            let original = try? Data(contentsOf: item.url)
+            let copy = try? Data(contentsOf: volume.appending(path: name))
+            check("\(name) on the disc is identical to its source", original != nil && original == copy, "\(original?.count ?? -1) vs \(copy?.count ?? -1) bytes")
+        }
+        if let first = onDisc.first, let item = await BurnScanner.read(volume.appending(path: first)) {
+            check("a file read back from the disc is a valid MP3 with its tags", item.title == "One" && abs(item.seconds - 8) < 0.3, "\(item.title) \(item.seconds)")
+        }
     }
 
     /// Reads the Mac's real burner through DiscRecordingBurner. Runs only with RIPPLE_REAL_DRIVE=1, and never writes.
@@ -621,5 +681,17 @@ enum SelfTest {
         exitCode = code
         for window in NSApp.windows { if let sheet = window.attachedSheet { window.endSheet(sheet) } }
         NSApp.terminate(nil)
+    }
+}
+
+/// Remembers the last progress step printed, so the log shows one line per 10 percent.
+private nonisolated final class ProgressMemory: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last = -1.0
+
+    func changed(to value: Double) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        defer { last = value }
+        return last != value
     }
 }

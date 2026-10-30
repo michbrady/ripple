@@ -7,6 +7,15 @@ import RippleKit
 /// Status is read the way `drutil` and System Information do. The write path (`burn`) has been
 /// checked against the framework's API but not yet run on a real blank disc: see docs/STORIES.md S-031.
 final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
+    /// What the drive does when the burn finishes. The app ejects; a test that reads the disc back mounts it.
+    enum Completion: Sendable { case eject, mount }
+
+    private let completion: Completion
+
+    init(completion: Completion = .eject) {
+        self.completion = completion
+    }
+
     /// The first optical drive that can write discs.
     private func device() -> DRDevice? {
         let devices = DRDevice.devices() as? [DRDevice] ?? []
@@ -74,11 +83,11 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
     }
 
     func burn(_ job: BurnJob, progress: @Sendable (BurnStage) -> Void) async throws {
-        try await Self.run(job, progress: progress, device: { self.device() })
+        try await Self.run(job, completion: completion, progress: progress, device: { self.device() })
     }
 
     @MainActor
-    private static func run(_ job: BurnJob, progress: @Sendable (BurnStage) -> Void, device: () -> DRDevice?) async throws {
+    private static func run(_ job: BurnJob, completion: Completion, progress: @Sendable (BurnStage) -> Void, device: () -> DRDevice?) async throws {
         progress(.preparing)
         guard let device = device() else { throw BurnError.noDisc }
         let layout: Any
@@ -88,22 +97,24 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
         case .data:
             let root = DRFolder(name: String(job.volumeName.prefix(32)))!
             for (index, file) in job.files.enumerated() {
-                // The number keeps the list order on players that play files by name.
-                let stem = FileNamer.clean(file.deletingPathExtension().lastPathComponent, maxBytes: 48)
                 guard let item = DRFile(path: file.path) else { continue }
-                item.setBaseName(String(format: "%02d - ", index + 1) + stem + "." + file.pathExtension)
+                // The number keeps the list order on players that play files by name.
+                item.setBaseName(BurnNaming.discFileName(position: index + 1, of: job.files.count, original: file))
                 root.addChild(item)
             }
             layout = DRTrack(forRootFolder: root) as Any
         }
         guard let burn = DRBurn(device: device) else { throw BurnError.noDisc }
         burn.setProperties([
-            DRBurnCompletionActionKey: DRBurnCompletionActionEject,
+            DRBurnCompletionActionKey: completion == .eject ? DRBurnCompletionActionEject : DRBurnCompletionActionMount,
             DRBurnVerifyDiscKey: true,
             DRBurnAppendableKey: false,
         ])
         burn.writeLayout(layout)
 
+        // RIPPLE_BURN_DEBUG=1 logs every state the framework reports, to learn how a real burn proceeds.
+        let debug = ProcessInfo.processInfo.environment["RIPPLE_BURN_DEBUG"] == "1"
+        var lastLogged = ""
         var writing = false
         while true {
             try? await Task.sleep(for: .milliseconds(300))
@@ -113,6 +124,13 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
             }
             let status = burn.status() as? [String: Any] ?? [:]
             let percent = (status[DRStatusPercentCompleteKey] as? Double) ?? 0
+            if debug {
+                let line = "\(status[DRStatusStateKey] as? String ?? "nil") \(Int(percent * 100))%"
+                if line != lastLogged {
+                    lastLogged = line
+                    FileHandle.standardError.write(Data("BURN \(line)\n".utf8))
+                }
+            }
             switch status[DRStatusStateKey] as? String {
             case DRStatusStateDone:
                 return

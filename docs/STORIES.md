@@ -353,7 +353,7 @@ Acceptance:
 - [snap] The done page says the disc is ready and ejects it.
 - [manual] The disc plays all tracks in order in a CD player.
 Status: doing
-Note: Logic is done against the stand-in burner. The real DiscRecording write path compiles and follows the API, but has not written a disc. Needs a blank CD-R and a person to play the result in a CD player. Do not run it on a disc you want to keep: DVD-R and CD-R are write-once.
+Note: The real write path works for an MP3 Disc (see S-033). An Audio Disc has not been burned: it needs a blank CD-R (or CD-RW), and a person to play the result in a CD player. The progress shown during the first real burn was 'Finishing...' for about four minutes (a DVD-R finalizes slowly); set RIPPLE_BURN_DEBUG=1 to log the framework's real states on the next burn.
 
 ### S-032 Cancel a burn and handle burn errors
 As the user, I can cancel before the burn starts, and I get a clear message if it fails.
@@ -376,7 +376,7 @@ Acceptance:
 - [self] The fixture burn target receives the original MP3 files byte for byte, with the folder layout kept.
 - [manual] The disc mounts on a Mac and the MP3 files play from it.
 Status: doing
-Note: Logic is done against the stand-in. Files go on the disc as numbered names (01 - Title.mp3) so players that sort by name keep the list order. Needs a real MP3 Disc burn (a blank DVD-R is in the drive) and a check that it mounts and plays.
+Note: FIRST REAL BURN, 2026-10-30, on the blank DVD-R (now used up): three MP3 files burned as an MP3 Disc through DiscRecordingBurner with verification on. The disc mounts on the Mac, holds all three files, and each is byte-for-byte identical to its source (SHA-256), and decodes as MP3. Raw sectors show a hybrid disc: ISO 9660, Joliet (long names), UDF, and HFS+. The file names came out doubled (01 - 01 - One.mp3); fixed afterwards in BurnNaming and covered by unit tests, but not burned again. Still to do: burn again to confirm the names, and play the disc in a standalone MP3 player. For repeat tests use a rewritable disc (DVD-RW or CD-RW); a blank DVD-R or CD-R is used up by one test.
 
 ## M6 Polish
 Settings, eject, auto-start, icon.
