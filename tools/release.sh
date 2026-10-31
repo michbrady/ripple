@@ -77,4 +77,4 @@ spctl --assess --type open --context context:primary-signature -vv website/Rippl
 
 # 6. Update the web page: size, checksum, and wording that says it is notarized.
 python3 website/source/build.py
-print "done. Upload website/index.html and website/Ripple.dmg."
+print "done. Upload website/index.html, website/privacy.html, and website/Ripple.dmg."

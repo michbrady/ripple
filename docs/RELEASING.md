@@ -44,7 +44,7 @@ It checks the setup, builds with the hardened runtime, signs, sends the app to A
 attaches Apple's ticket, packs and signs the installer, notarizes that too, asks macOS to judge the result, and rebuilds
 the web page. The page says "signed and notarized" only when the ticket is really attached to `website/Ripple.dmg`.
 
-Then upload `website/index.html` and `website/Ripple.dmg`.
+Then upload `website/index.html`, `website/privacy.html`, and `website/Ripple.dmg`.
 
 If Apple says no, the script prints Apple's own explanation and stops.
 

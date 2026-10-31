@@ -101,6 +101,7 @@ enum SelfTest {
             await installerChecks(out: out)
             realDriveChecks()
             libraryChecks()
+            linkChecks()
             await realBurnCheck(out: out)
             coverPrepChecks()
 
@@ -666,6 +667,15 @@ enum SelfTest {
             position += 8 + size + (size % 2)
         }
         return nil
+    }
+
+    /// The links the app opens must be secure web addresses on the right site, and the privacy page must sit beside the main page.
+    private static func linkChecks() {
+        check("the website link is a secure address on bradysbit.com",
+              AppLinks.website.scheme == "https" && AppLinks.website.host == "www.bradysbit.com" && AppLinks.website.path == "/ripple/")
+        check("the privacy page is a secure address beside the website",
+              AppLinks.privacy.scheme == "https" && AppLinks.privacy.host == AppLinks.website.host
+              && AppLinks.privacy.path == "/ripple/privacy.html")
     }
 
     /// LAME must be a separate, replaceable library inside the app (it is LGPL), not code inside the program.

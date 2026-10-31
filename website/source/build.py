@@ -3,7 +3,7 @@
 
 Usage: python3 website/source/build.py     (run from the repo root; website/Ripple.dmg must exist)
 """
-import base64, hashlib, os, subprocess, urllib.parse
+import base64, hashlib, os, re, subprocess, urllib.parse
 
 here = os.path.dirname(os.path.abspath(__file__))
 site = os.path.dirname(here)
@@ -59,5 +59,18 @@ for key, value in fills.items():
 assert "{{" not in page, "an unfilled placeholder is left"
 out = os.environ.get("PAGE_OUT") or os.path.join(site, "index.html")
 open(out, "w").write(page)
+# The privacy page: the same styling and logo as the main page, so the two always match.
+style = re.search(r"<style>(.*?)</style>", page, re.S).group(1)
+privacy = open(os.path.join(here, "privacy.html")).read()
+for key, value in {"STYLE": style, "LOGO": logo, "FAVICON": fills["FAVICON"]}.items():
+    privacy = privacy.replace("{{%s}}" % key, value)
+assert "{{" not in privacy, "an unfilled placeholder is left in the privacy page"
+# The pages must point at each other, and the tip link must be there.
+assert 'href="privacy.html"' in page, "the main page does not link to the privacy page"
+assert 'href="./"' in privacy, "the privacy page does not link back"
+assert "https://ko-fi.com/bradysbit" in page, "the Ko-fi tip link is missing"
+privacy_out = os.environ.get("PRIVACY_OUT") or os.path.join(site, "privacy.html")
+open(privacy_out, "w").write(privacy)
+print(f"wrote {privacy_out}")
 print(f"download is {'signed and NOTARIZED' if notarized else 'not notarized'}")
 print(f"wrote {out} ({len(page) // 1024} KB); Ripple.dmg is {fills['DL_SIZE']}, sha256 {fills['DL_SHA'][:16]}...")

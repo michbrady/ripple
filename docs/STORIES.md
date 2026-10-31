@@ -438,6 +438,16 @@ UX:
 Status: done
 Note: Ripple finds the installer by asking macOS which file an open disk image came from. It never looks inside your Downloads folder, so macOS does not show an access prompt for that. If the disk image was already ejected, Ripple cannot know where the file is and asks nothing. The Trash move itself is the real NSWorkspace call; the self-test makes its own disk images and never touches one you opened yourself (an earlier version of the test could see your real installer; see the fix log).
 
+### S-035 Link the app to its web page
+As the user, I can open Ripple's web page and its privacy page from the app.
+Screens: (menu bar, About window)
+Depends: S-005
+Acceptance:
+- [self] The website link is a secure address on bradysbit.com, and the privacy page is a secure address beside it.
+- [manual] Help > Ripple Website and Help > Privacy and Terms open those pages in the browser; the About window shows both as links.
+Status: done
+Note: Ripple is free. The web page carries a Ko-fi tip link and a privacy and terms page that says what the app sends (a disc lookup to MusicBrainz, the Cover Art Archive, and Apple's iTunes Search) and what it keeps (nothing but settings on the Mac). Add a contact address to the privacy page when there is one.
+
 ## Dropped
 - Accounts, sync, sharing, and teams: Ripple has one user and no server.
 - A file-name template editor: the default `Artist/Album/01 - Title` handles multi-disc and compilations.

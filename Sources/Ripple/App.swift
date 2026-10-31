@@ -29,6 +29,10 @@ struct RippleApp: App {
         .defaultSize(width: 760, height: 560)
         .windowToolbarStyle(.unified)
         .commands {
+            CommandGroup(replacing: .help) {
+                Button("Ripple Website") { NSWorkspace.shared.open(AppLinks.website) }
+                Button("Privacy and Terms") { NSWorkspace.shared.open(AppLinks.privacy) }
+            }
             CommandGroup(replacing: .appInfo) {
                 Button("About Ripple") { AboutPanel.show() }
             }
@@ -119,6 +123,14 @@ enum AboutPanel {
             The licence and source notice are in the app's Resources/Licenses folder. \
             Album details from MusicBrainz. Cover pictures from the Cover Art Archive and the iTunes Search API.
             """, attributes: body))
+        credits.append(NSAttributedString(string: "\n\n", attributes: body))
+        credits.append(NSAttributedString(string: "www.bradysbit.com/ripple", attributes: [
+            .font: NSFont.systemFont(ofSize: 11), .link: AppLinks.website,
+        ]))
+        credits.append(NSAttributedString(string: "  \u{00B7}  ", attributes: body))
+        credits.append(NSAttributedString(string: "Privacy and terms", attributes: [
+            .font: NSFont.systemFont(ofSize: 11), .link: AppLinks.privacy,
+        ]))
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
         NSApp.activate()
     }

@@ -1,8 +1,10 @@
 # Ripple web page
 
-Upload these two files to the same folder on the web server (for example `bradysbit.com/ripple/`):
+Upload these three files to the same folder on the web server (`bradysbit.com/ripple/`):
 
 - `index.html` is the whole page. The screenshots, logo, and styles are inside it.
+- `privacy.html` is the privacy and terms page. The app's Help menu and About window link to it by this name,
+  so it must sit next to `index.html`.
 - `Ripple.dmg` is the download: an installer disk image with Ripple and an Applications folder to drag it onto.
   The page links to it as `Ripple.dmg`, so it must sit next to `index.html`.
 
