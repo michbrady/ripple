@@ -72,3 +72,9 @@ Cause: The check was `codesign -dv "$app" 2>&1 | grep -q runtime` under `set -o 
 Fix: Read the whole output into a variable, then test it.
 Rule: Never end a pipeline in `grep -q` in a script that uses pipefail. Capture the output, then match it.
 (The "timestamps differ by 181 seconds" warning in the same run was only codesign waiting for the keychain prompt to be approved.)
+
+## The release script died right after Apple accepted the app (M6, found on the first real release)
+Symptom: `notarize:4: read-only variable: status`, immediately after Apple's answer. Apple's history showed the app Accepted.
+Cause: In zsh, `status` is a special read-only variable (the same as `$?`). The script used it as an ordinary name.
+Fix: Renamed it `verdict`.
+Rule: In zsh scripts, never name a variable `status`, `path`, `argv`, `options`, `pipestatus`, or other shell built-ins. Check a new script by running it once end to end on a harmless input before relying on it.

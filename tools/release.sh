@@ -45,13 +45,13 @@ run_selftest
 
 # Sends a file to Apple and waits. Stops with Apple's own explanation if it is not accepted.
 notarize() {
-  local file=$1 json status id
+  local file=$1 json verdict id
   print "sending $(basename "$file") to Apple (this takes a few minutes)..."
   json=$(xcrun notarytool submit "$file" --keychain-profile "$profile" --wait --output-format json)
-  status=$(print -r -- "$json" | python3 -I -c 'import json,sys; print(json.load(sys.stdin).get("status",""))')
+  verdict=$(print -r -- "$json" | python3 -I -c 'import json,sys; print(json.load(sys.stdin).get("status",""))')
   id=$(print -r -- "$json" | python3 -I -c 'import json,sys; print(json.load(sys.stdin).get("id",""))')
-  if [[ "$status" != "Accepted" ]]; then
-    print -u2 "Apple said: $status. Its explanation:"
+  if [[ "$verdict" != "Accepted" ]]; then
+    print -u2 "Apple said: $verdict. Its explanation:"
     xcrun notarytool log "$id" --keychain-profile "$profile" >&2 || true
     die "notarization of $(basename "$file") failed."
   fi

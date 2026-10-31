@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Tell the browser both themes are supported before it paints, to avoid a flash of the wrong one. -->
 <meta name="color-scheme" content="light dark">
-<title>Ripple, a CD ripper and burner for Mac | BradysBit</title>
-<meta name="description" content="Ripple turns audio CDs into MP3 or M4A files on your Mac, looks up the album and cover, names every file after its song, and burns MP3s back to a disc. A BradysBit app.">
-<meta property="og:title" content="Ripple, a CD ripper for Mac">
-<meta property="og:description" content="Turn your CDs into MP3s, named properly. Burn MP3s to a disc. A BradysBit app.">
+<title>Ripple: rip CDs and burn music CDs on your Mac | BradysBit</title>
+<meta name="description" content="Ripple rips your CDs to MP3 or M4A on your Mac, looks up the album and cover, names every file after its song, and burns a regular music CD that plays in any standard CD player. A BradysBit app.">
+<meta property="og:title" content="Ripple: rip CDs, burn music CDs">
+<meta property="og:description" content="Rip CDs to MP3 or M4A, named properly. Burn a regular music CD that plays in any CD player. A BradysBit app.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://www.bradysbit.com/ripple/">
 <link rel="canonical" href="https://www.bradysbit.com/ripple/">
@@ -159,8 +159,8 @@
   <div class="wrap">
     <div class="hero">
       <span class="eyebrow">A BradysBit app &middot; Version 0.1</span>
-      <h1>Turn your CDs into MP3s, named properly.</h1>
-      <p class="lead">Put in a disc. Ripple copies the tracks to MP3 or M4A files on your Mac, finds the album, the song titles, and the cover, and names every file after its song. It can burn MP3s back to a disc too.</p>
+      <h1>Rip your CDs. Burn music CDs that play anywhere.</h1>
+      <p class="lead">Put in a disc. Ripple copies the tracks to MP3 or M4A files on your Mac, finds the album, the song titles, and the cover, and names every file after its song. Then burn your MP3s to a regular music CD that plays in any standard CD player, car stereo, or old boom box.</p>
       <div class="actions">
         <a class="btn primary" href="Ripple.dmg" download>Download for Mac</a>
         <a class="btn" href="#how">See how it works</a>
@@ -177,14 +177,25 @@
     </div>
   </div>
 
+  <section id="formats">
+    <div class="wrap">
+      <h2>Rip it. Burn it.</h2>
+      <p class="sub">Two jobs, each with the formats you would expect.</p>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))">
+        <div class="card"><h3>Rip a CD</h3><p><b>In:</b> any audio CD.<br><b>Out:</b> MP3 files (variable or fixed quality, up to 320 kbps) or M4A files (AAC), named by song and filled with the album details and cover.</p></div>
+        <div class="card"><h3>Burn a CD</h3><p><b>In:</b> a folder of MP3 files.<br><b>Out:</b> a regular music CD (the standard audio CD format) that plays in any standard CD player, or an MP3 Disc for players that read MP3 files.</p></div>
+      </div>
+    </div>
+  </section>
+
   <section id="how">
     <div class="wrap">
-      <h2>Three steps</h2>
+      <h2>Ripping a CD, in three steps</h2>
       <p class="sub">No setup screens and no file name templates to learn.</p>
       <ol class="steps">
         <li><h3>Insert a disc</h3><p>Plug in a CD drive and insert an audio disc. Ripple shows its tracks right away.</p></li>
         <li><h3>Check the details</h3><p>Ripple looks up the album, the artist, the track titles, and the cover. It tells you when a match is only a guess. Fix anything that looks wrong, or pick a different match.</p></li>
-        <li><h3>Rip</h3><p>Press Rip. Your files land in the folder you chose, in <code>Artist/Album</code> folders, named <code>01 - Song Title.mp3</code>.</p></li>
+        <li><h3>Rip</h3><p>Press Rip. Your files land in the folder you chose, in <code>Artist/Album</code> folders, named <code>01 - Song Title.mp3</code> (or <code>.m4a</code>).</p></li>
       </ol>
     </div>
   </section>
@@ -201,7 +212,7 @@
         <div class="card"><h3>Details inside every file</h3><p>Title, artist, album, year, track and disc numbers, and the cover are written into each file, so other players can show them.</p></div>
         <div class="card"><h3>MP3 or M4A</h3><p>Choose MP3 (variable or fixed quality, up to 320 kbps) or M4A (AAC at 256 kbps). The choice is saved.</p></div>
         <div class="card"><h3>Checks for scratches</h3><p>Ripple reads each part of the disc again to make sure the reads agree. A track it cannot read cleanly is still saved, marked Needs Attention, and you can rip just that track again.</p></div>
-        <div class="card"><h3>Burns MP3s to a disc</h3><p>Choose a folder of MP3 files and burn a standard Audio CD that plays in old CD players, car stereos, and boom boxes, or an MP3 Disc that holds many hours.</p></div>
+        <div class="card"><h3>Burns a regular music CD</h3><p>Choose a folder of MP3 files and burn a standard Audio CD. It plays in any standard CD player, car stereo, or old boom box. Or burn an MP3 Disc, which holds many hours for players that read MP3 files.</p></div>
         <div class="card"><h3>Private</h3><p>No account and no tracking. The only thing Ripple sends over the internet is the album and cover lookup, and ripping works without it.</p></div>
       </div>
     </div>
@@ -227,8 +238,9 @@
         <img src="{{BURN_LIGHT}}" width="1000" height="654" loading="lazy" alt="Ripple's Burn mode showing a list of six MP3 files, an Audio CD and MP3 Disc switch, and a capacity bar showing 22 minutes of 79 used.">
       </picture>
       <div>
-        <h2>Burn a folder of MP3s to a disc.</h2>
-        <p class="sub" style="margin-bottom:1rem">Choose a folder, drag files into the order you want, and watch the capacity bar. If the files do not fit, Ripple says how much to remove. An <b>Audio CD</b> is the standard CD format, so it plays in old CD players and car stereos (use a blank CD-R). An <b>MP3 Disc</b> holds many hours, for players that read MP3 files.</p>
+        <h2>Burn a music CD that plays in any CD player.</h2>
+        <p class="sub" style="margin-bottom:1rem">Choose a folder of MP3 files, drag them into the order you want, and watch the capacity bar. Ripple turns them into a regular <b>Audio CD</b>, the standard format, so it plays in standard CD players, car stereos, and old boom boxes. Use a blank <b>CD-R</b>: many older players cannot read CD-RW discs. If the files do not fit, Ripple says how much to remove.</p>
+        <p class="sub" style="margin-bottom:0">Prefer to keep the files as they are? Burn an <b>MP3 Disc</b> instead. It holds many hours, for players that read MP3 files.</p>
       </div>
     </div>
   </section>
@@ -263,6 +275,7 @@
       <p class="sub">Ripple is new. Here is what has been tried, and what has not.</p>
       <ul class="list">
         <li><b>Ripping</b> has been tried on real music CDs with one USB drive, including a disc with a data session. The audio matched the Mac&rsquo;s own copy exactly.</li>
+        <li><b>Burning takes MP3 files.</b> Other kinds of audio files, such as M4A, are not accepted for burning yet.</li>
         <li><b>Burning an MP3 Disc</b> has been tried on a real disc and checked file by file. <b>Burning an Audio CD</b> has not been tried on a real CD-R yet.</li>
         <li><b>Check for errors</b> catches reads that fail or disagree. It cannot catch a drive that repeats the same wrong data twice. Stronger checking is planned.</li>
         {{NOTARY_BULLET}}
@@ -276,7 +289,7 @@
       <h2>Requirements</h2>
       <dl>
         <dt>A Mac</dt><dd>With Apple silicon, running macOS 26 or later.</dd>
-        <dt>A disc drive</dt><dd>Most Macs have no disc drive. A USB CD or DVD drive works. Burning needs a drive that can write discs and a blank disc.</dd>
+        <dt>A disc drive</dt><dd>Most Macs have no disc drive. A USB CD or DVD drive works. Burning needs a drive that can write discs and a blank disc: a CD-R for a regular music CD.</dd>
         <dt>Internet</dt><dd>Only for the album and cover lookup. You can type the details yourself without it.</dd>
       </dl>
     </div>

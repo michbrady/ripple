@@ -57,7 +57,7 @@ fills = {
 for key, value in fills.items():
     page = page.replace("{{%s}}" % key, value)
 assert "{{" not in page, "an unfilled placeholder is left"
-out = os.path.join(site, "index.html")
+out = os.environ.get("PAGE_OUT") or os.path.join(site, "index.html")
 open(out, "w").write(page)
 print(f"download is {'signed and NOTARIZED' if notarized else 'not notarized'}")
 print(f"wrote {out} ({len(page) // 1024} KB); Ripple.dmg is {fills['DL_SIZE']}, sha256 {fills['DL_SHA'][:16]}...")
