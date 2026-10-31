@@ -35,6 +35,13 @@ STEP3 = (
     'version is not notarized by Apple yet. Open <b>System Settings</b>, choose <b>Privacy &amp; Security</b>, scroll to Security, '
     'and choose <b>Open Anyway</b>. You only do this the first time.</p></li>'
 )
+# What people will see the first time, so it does not look like a warning. Only true once Apple has notarized the file.
+FIRST_OPEN_NOTE = (
+    '<div class="notice"><p><b>The first time you open Ripple, macOS asks you to confirm.</b></p>'
+    '<p>It says that Ripple was downloaded from the internet and asks if you want to open it. It also tells you that Apple '
+    'checked it for malicious software and found none. That is normal for any app you download. Choose <b>Open</b>. '
+    'It only asks once.</p></div>'
+) if notarized else ""
 NOTARY_BULLET = (
     '<li><b>Signed and notarized.</b> Apple has checked this download for known malicious software.</li>'
 ) if notarized else (
@@ -49,6 +56,7 @@ fills = {
     "DL_SHA": hashlib.sha256(data).hexdigest(),
     "INSTALLER": image("installer"),
     "STEP3": STEP3,
+    "FIRST_OPEN_NOTE": FIRST_OPEN_NOTE,
     "NOTARY_BULLET": NOTARY_BULLET,
     "TRACKS_LIGHT": image("tracks-light"), "TRACKS_DARK": image("tracks-dark"),
     "PICKER_LIGHT": image("picker-light"), "PICKER_DARK": image("picker-dark"),
