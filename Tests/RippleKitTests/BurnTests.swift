@@ -257,3 +257,46 @@ import Testing
         #expect(Self.name(1, "AC:DC.mp3") == "01 - AC-DC.mp3")
     }
 }
+
+@Suite struct InstallerLeftoverTests {
+    static func fixtureData() throws -> Data {
+        let url = try #require(Bundle.module.url(forResource: "hdiutil-info", withExtension: "plist", subdirectory: "Fixtures"))
+        return try Data(contentsOf: url)
+    }
+
+    @Test func readsRealHdiutilOutput() throws {
+        let images = MountedImage.parse(try Self.fixtureData())
+        #expect(images.count == 2)
+        #expect(images[1].imagePath == "/tmp/ripple-dl-test/Ripple.dmg")
+        #expect(images[1].mountPoints == ["/Volumes/Ripple 3"])
+        #expect(images[0].imagePath == "/Users/someone/Downloads/Other App.dmg")
+    }
+
+    @Test func findsOnlyTheImageWhoseVolumeIsOurInstaller() throws {
+        let images = MountedImage.parse(try Self.fixtureData())
+        let found = InstallerLeftover.find(in: images) { $0.lastPathComponent.hasPrefix("Ripple") }
+        #expect(found == InstallerLeftover(image: URL(fileURLWithPath: "/tmp/ripple-dl-test/Ripple.dmg"),
+                                           volumes: [URL(fileURLWithPath: "/Volumes/Ripple 3", isDirectory: true)]))
+        #expect(InstallerLeftover.find(in: images) { _ in false } == nil)
+    }
+
+    @Test func aFileOpenedTwiceHasEveryVolumeFound() {
+        let images = [MountedImage(imagePath: "/Users/me/Downloads/Ripple.dmg", mountPoints: ["/Volumes/Ripple 1"]),
+                      MountedImage(imagePath: "/Users/me/Downloads/Other.dmg", mountPoints: ["/Volumes/Ripple 9"]),
+                      MountedImage(imagePath: "/Users/me/Downloads/Ripple.dmg", mountPoints: ["/Volumes/Ripple 2"])]
+        let found = InstallerLeftover.find(in: images) { $0.lastPathComponent != "Ripple 9" }
+        #expect(found?.image.path == "/Users/me/Downloads/Ripple.dmg")
+        #expect(found?.volumes.map(\.path) == ["/Volumes/Ripple 1", "/Volumes/Ripple 2"])
+    }
+
+    @Test func ignoresImagesWithNoFileBehindThem() {
+        let images = [MountedImage(imagePath: nil, mountPoints: ["/Volumes/Ripple"]),
+                      MountedImage(imagePath: "/Users/me/Downloads/Ripple.sparseimage", mountPoints: ["/Volumes/Ripple 1"])]
+        #expect(InstallerLeftover.find(in: images) { _ in true } == nil)
+    }
+
+    @Test func unreadableOutputGivesNothing() {
+        #expect(MountedImage.parse(Data("not a plist".utf8)).isEmpty)
+        #expect(MountedImage.parse(Data()).isEmpty)
+    }
+}

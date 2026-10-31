@@ -2,6 +2,12 @@
 
 Bugs found while building, newest first. Each ends with a rule.
 
+## A test could have trashed my user's real installer (M6, caught before it did any harm)
+Symptom: The installer-cleanup self-test recorded a "Keep" for `~/Downloads/Ripple.dmg`, a file the user had really downloaded and opened, and its later "yes" steps then failed.
+Cause: The test asked the real finder for open disk images, and the finder returns the first Ripple installer it sees, which was the user's, not the test's. Only a faked "no" ran against it. A faked "yes" would have ejected and trashed the real file.
+Fix: The test now sees only the disk images it made itself (filtered by their folder). A file opened twice is also handled: every copy is ejected.
+Rule: A test that can eject, move, or delete must be unable to see anything it did not create. Filter the inputs, not just the outputs.
+
 ## A loose MusicBrainz match was filled in as if it were the album, and the right album ranked last (M5, found on the first real music CD)
 Symptom: The disc "Songs for Silly Time" (Twin Sisters) was shown as "GrandMix Nouveau Disco" by Ben Liebrand, with wrong titles.
 Cause: MusicBrainz had no record of this disc's exact ID, so the lookup fell back to a loose search by table of contents and returned six albums, all with 32 tracks. Ripple took the first as the answer without saying so. It ranked them by format and year, and the right album (no format, no year) came last.

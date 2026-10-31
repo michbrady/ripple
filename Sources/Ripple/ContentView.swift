@@ -51,6 +51,11 @@ struct ContentView: View {
             burn.start()
             SelfTest.runIfRequested(model: model, burn: burn)
             Snapshot.runIfRequested(model: model, burn: burn, openSettings: openSettings)
+            // The installer is still open after a drag install: offer to eject it and trash the .dmg.
+            if !Store.isOverridden {
+                try? await Task.sleep(for: .seconds(1.5))
+                await InstallerCleanup().offer()
+            }
         }
     }
 

@@ -421,6 +421,23 @@ Acceptance:
 Status: done
 Note: Rendered in every look with tools/icon_review.sh (/tmp/Ripple-icon.png). Look at the Dock by hand.
 
+### S-034 Offer to trash the installer
+As the user, after I drag Ripple to Applications and open it, I am asked whether to move the installer to the Trash.
+Screens: (a system alert, not a snapshot page)
+Depends: S-005
+Acceptance:
+- [unit] The open disk images are read from `hdiutil info -plist`; only an image with a file behind it whose volume holds this app is offered; a file opened twice has every volume found.
+- [self] Running from outside Applications or ~/Applications offers nothing.
+- [self] With the installer open, the user is asked once; Keep leaves the disk image open and the file in place, and the same file is not asked about again.
+- [self] Move to Trash ejects every copy of the disk image and moves the .dmg to the Trash. With no installer open, nothing is offered.
+UX:
+- Flow: first launch from Applications -> 1.5 s later an alert -> Move to Trash ejects the disk image and trashes the .dmg, or Keep does nothing and is remembered for that file.
+- Surface: alert (a problem-free question that needs an answer now; no other row fits).
+- Words: "Ripple is installed." / "The installer, \u201CRipple.dmg\u201D, is still open. You do not need it now. Move it to the Trash? This also ejects it." Buttons "Move to Trash" and "Keep".
+- Access: Return moves it to the Trash; the alert reads aloud as written.
+Status: done
+Note: Ripple finds the installer by asking macOS which file an open disk image came from. It never looks inside your Downloads folder, so macOS does not show an access prompt for that. If the disk image was already ejected, Ripple cannot know where the file is and asks nothing. The Trash move itself is the real NSWorkspace call; the self-test makes its own disk images and never touches one you opened yourself (an earlier version of the test could see your real installer; see the fix log).
+
 ## Dropped
 - Accounts, sync, sharing, and teams: Ripple has one user and no server.
 - A file-name template editor: the default `Artist/Album/01 - Title` handles multi-disc and compilations.

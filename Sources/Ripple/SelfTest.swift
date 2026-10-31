@@ -98,6 +98,7 @@ enum SelfTest {
             await attentionChecks(model: model, out: out)
             await burnChecks(burn: burn, out: out)
             await polishChecks(model: model, out: out)
+            await installerChecks(out: out)
             realDriveChecks()
             await realBurnCheck(out: out)
             coverPrepChecks()
@@ -251,6 +252,92 @@ enum SelfTest {
         check("Eject asks the burner to eject", burner.ejectCount == 1)
         burn.clear()
         burner.set(FixtureBurner.blankCD())
+    }
+
+    /// S-034: after a drag install, offer to eject the open installer and trash the .dmg. Real disk images, a real eject,
+    /// and a real move to the Trash; only the answer to the question is faked.
+    private static func installerChecks(out: URL) async {
+        let fm = FileManager.default
+        func run(_ args: [String]) -> Bool {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+            process.arguments = args
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return false }
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        }
+        // A copy of this very app, packed into a disk image the way the installer is.
+        let source = out.appending(path: "installer-src", directoryHint: .isDirectory)
+        try? fm.createDirectory(at: source, withIntermediateDirectories: true)
+        let copy = Process()
+        copy.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        copy.arguments = [Bundle.main.bundleURL.path, source.appending(path: "Ripple.app").path]
+        try? copy.run()
+        copy.waitUntilExit()
+        let downloads = out.appending(path: "fake-downloads", directoryHint: .isDirectory)
+        try? fm.createDirectory(at: downloads, withIntermediateDirectories: true)
+        func makeAndMount(_ name: String, volume: String) -> (dmg: URL, mount: URL)? {
+            let dmg = downloads.appending(path: name)
+            guard run(["create", "-srcfolder", source.path, "-volname", volume, "-format", "UDZO", "-ov", dmg.path]),
+                  run(["attach", dmg.path, "-readonly", "-nobrowse", "-noautoopen", "-quiet"]) else { return nil }
+            return (dmg, URL(fileURLWithPath: "/Volumes/\(volume)", isDirectory: true))
+        }
+        let installed = URL(fileURLWithPath: NSHomeDirectory() + "/Applications/Ripple.app")
+
+        guard let first = makeAndMount("Ripple.dmg", volume: "RippleInstallTestA") else {
+            check("a test installer disk image can be made and opened", false)
+            return
+        }
+        var asked = 0
+        var answer = false
+        var cleanup = InstallerCleanup()
+        cleanup.ask = { _ in asked += 1; return answer }
+        // The test sees only its own disk images, never one you opened yourself.
+        let mine = downloads.resolvingSymlinksInPath().path
+        cleanup.images = {
+            InstallerCleanup.runningImages().filter {
+                $0.imagePath.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path.hasPrefix(mine) } ?? false
+            }
+        }
+
+        check("running from outside Applications offers nothing", await cleanup.offer(installedAt: URL(fileURLWithPath: "/tmp/Ripple.app")) == .notInstalled
+              && asked == 0 && fm.fileExists(atPath: first.mount.path))
+        check("an open installer is found when Ripple is installed, and the user is asked", await { () -> Bool in
+            answer = false
+            let outcome = await cleanup.offer(installedAt: installed)
+            return outcome == .declined && asked == 1
+        }())
+        check("Keep leaves the disk image open and the file in place", fm.fileExists(atPath: first.mount.path) && fm.fileExists(atPath: first.dmg.path))
+        check("after Keep, the same installer is not asked about again", await { () -> Bool in
+            answer = true
+            let outcome = await cleanup.offer(installedAt: installed)
+            return outcome == .declined && asked == 1
+        }())
+
+        // A different installer file: this time the answer is yes.
+        _ = run(["detach", first.mount.path, "-force", "-quiet"])
+        guard let second = makeAndMount("Ripple 2.dmg", volume: "RippleInstallTestB") else {
+            check("a second test installer can be opened", false)
+            return
+        }
+        answer = true
+        let outcome = await cleanup.offer(installedAt: installed)
+        var trashedAt: URL?
+        if case .trashed(let url) = outcome { trashedAt = url }
+        check("Move to Trash ejects the disk image", outcome != .declined && !fm.fileExists(atPath: second.mount.path), "\(outcome)")
+        check("Move to Trash takes the .dmg out of its folder", !fm.fileExists(atPath: second.dmg.path))
+        check("the .dmg is in the Trash", trashedAt.map { fm.fileExists(atPath: $0.path) } == true, "\(trashedAt?.path ?? "nil")")
+        if let trashedAt { try? fm.removeItem(at: trashedAt) }
+
+        check("with no installer open, nothing is offered", await cleanup.offer(installedAt: installed) == .nothingToClean)
+        check("only Applications and ~/Applications count as installed",
+              InstallerCleanup.isInstalledLocation(URL(fileURLWithPath: "/Applications/Ripple.app"))
+              && InstallerCleanup.isInstalledLocation(installed)
+              && !InstallerCleanup.isInstalledLocation(URL(fileURLWithPath: "/Volumes/Ripple/Ripple.app"))
+              && !InstallerCleanup.isInstalledLocation(URL(fileURLWithPath: NSHomeDirectory() + "/Downloads/Ripple.app")))
+        try? fm.removeItem(at: first.dmg)
     }
 
     /// S-022 to S-024: eject when done, start on a match, and clear messages.

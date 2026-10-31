@@ -12,6 +12,7 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | Audio CD | A burned disc in the standard audio CD format: it plays in old CD players, car stereos, and boom boxes (MP3s converted to CD audio) | Audio Disc, music CD, Red Book |
 | MP3 Disc | A burned disc holding the MP3 files unchanged | data CD, MP3 CD |
 | Mode | Rip or Burn: what the window is for | tab, page |
+| Installer | The downloaded Ripple.dmg, the disk image you drag Ripple out of | setup, package |
 | Source Folder | The Mac folder whose MP3 files get burned | input folder, library |
 | Format | MP3 or M4A, the kind of file a rip makes | codec, encoder, type |
 | Quality | How much detail an MP3 keeps: variable (default) or a fixed rate | bitrate, preset |
