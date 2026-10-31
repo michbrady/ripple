@@ -1,29 +1,48 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Ripple
 
-A native macOS app in SwiftUI. It runs on this Mac only, with a local
-SwiftData database and no server.
+A native macOS 26 app in SwiftUI (a BradysBit app, bundle id `com.michael.ripple`). One window: it rips an audio CD to MP3 or M4A with a MusicBrainz lookup, and burns MP3 files to an Audio CD or MP3 Disc. It runs on this Mac only. There is no database and no server; only settings are saved (UserDefaults).
+
+Read `ARCHITECTURE.md` for the targets, seams, and what each type does. `docs/BRIEF.md` is the brief, `docs/STORIES.md` the user stories, `docs/FIXLOG.md` the bugs found and the rule each taught, `docs/RELEASING.md` the signing and notarizing steps.
 
 ## Layout
 
-- `Sources/Ripple/` the app. `App.swift` has the window, menus, and the database location.
-- `Sources/RippleKit/` rules and data logic with no SwiftUI. Tests in `Tests/RippleKitTests/`.
+- `Sources/RippleKit/` rules and data logic with no SwiftUI or AppKit. Tests in `Tests/RippleKitTests/`.
+- `Sources/Ripple/` the app: SwiftUI views, DiskArbitration, `AppModel`, `BurnModel` (`Burn/`), real-drive adapters (`Disc/`). `UI/` holds the theme, grid, and window behaviors.
+- `Sources/CDShim/` (two CD ioctls in C) and `Sources/CLame/` (LAME header only). LAME is built from `vendor/lame` into `.lame/` and shipped as a separate dylib inside the app (LGPL).
 - `Package.swift` a Swift package. There is no Xcode project.
-- `build.sh` builds, signs, and installs `~/Applications/Ripple.app`.
-- `Icon/AppIcon.icon` the app icon, an Icon Composer file (JSON plus SVG layers). `build.sh` compiles it with `tools/make_icon.sh`; `tools/icon_review.sh` renders every look into one PNG.
-- `docs/` the brief, the screen index, and the user stories, when they exist.
+- `Icon/AppIcon.icon` an Icon Composer file; `tools/make_icon.sh` compiles it, `tools/icon_review.sh` renders every look into one PNG.
+- `website/` the download page and privacy page; `website/source/build.py` regenerates `index.html`.
+
+## Architecture rules
+
+- Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. Put decisions in RippleKit so they are testable with no UI and no drive.
+- Hardware and network sit behind seams (`AudioDisc`, `AlbumLookup`, `TrackWriter`, `DiscBurner`, `MusicBrainzClient.Transport`). Each has a fixture adapter used by tests, the self-test, and snapshots. Add new I/O the same way.
+- The `Ripple` target defaults to `@MainActor` isolation (`defaultIsolation`); RippleKit does not.
+- Ripping and burning are separate models (`AppModel`, `BurnModel`); both conform to `StoppableJob` so the quit prompt can ask every busy job.
 
 ## Build and check
 
+- First time (and after clearing `.lame/`): `tools/build-lame.sh`. `./build.sh` runs it for you, but plain `swift build` and `swift test` need it done first.
 - Build and install: `./build.sh`. Add `--open` to restart the app with the new build. The build shows warnings; fix them.
-- Unit tests: `swift test --scratch-path ~/Library/Developer/Ripple/test-build`.
-- Self-test (the app's real functions on a /tmp store): `tools/selftest.sh`. Exit 0 when every check passes. Add a check for every story with logic in `SelfTest.swift`.
+- Unit tests: `swift test --scratch-path ~/Library/Developer/Ripple/test-build`. One test: add `--filter RipperTests/testName`.
+- `RIPPLE_LIVE=1 swift test --filter LiveLookup` hits the real MusicBrainz and cover services. `RIPPLE_REAL_DRIVE=1` adds a read-only burner check to the self-test.
+- Self-test (the app's real functions on a fixture disc and a /tmp store): `tools/selftest.sh`. Exit 0 when every check passes. Add a check for every story with logic in `SelfTest.swift`. It runs the installed app, so run `./build.sh` first.
 - After every UI change, take snapshots with sample data and look at them: `tools/snap.sh`.
   It writes `/tmp/Ripple-shots/<page>-light.png` and `-dark.png` for every sidebar page, and `settings-<tab>-light.png` and `-dark.png` for every Settings tab, then quits. `APP_SNAPSHOT_PAGES=all,settings tools/snap.sh` limits the pages.
   For a panel, sheet, or popover, add a capture to `Snapshot.swift` like the Settings loop.
-- Snapshots, seed data, and the self-test refuse to run without `APP_STORE` in /tmp.
-- Never test against the real database in `~/Library/Application Support/Ripple/`.
+- Snapshots, seed data, and the self-test refuse to run without `APP_STORE` in /tmp (the scripts set it). Never test against the real settings or anything in `~/Library/Application Support/Ripple/`.
+- A test that can eject, move, or delete must not be able to see anything it did not create (see `docs/FIXLOG.md`).
 - Then check the grid: `tools/grid-lint.sh` and `swift tools/check-layout.swift /tmp/Ripple-shots/*-layout.json`. Both print PASS.
 - A change is done when the build has no errors, the grid checks pass, and you looked at the light and dark snapshots.
+- Real-disc and real-burner checks are manual; see the stories marked `doing` in `docs/STORIES.md`.
+
+## Release
+
+`tools/release.sh` builds with the hardened runtime, signs, notarizes the app and the DMG, and rebuilds the website. It needs the one-time Developer ID and `notarytool` keychain setup in `docs/RELEASING.md`. Never paste credentials into the chat or the project. Changing the bundle id resets people's saved settings.
 
 ## Design rules
 
