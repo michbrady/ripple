@@ -620,10 +620,11 @@ enum SelfTest {
             model.setAlbumTitle(verify ? "Checked" : "Unchecked")
             model.rip()
             await wait(until: { !model.isRipping })
-            // Three one-second tracks are 3 chunks of up to 26 sectors each: 9 reads if nothing is repeated.
+            // Three one-second tracks (75 sectors each). Without checking, reads are 26 sectors: 3 reads a track, 9 in all.
+            // With checking, reads are 300 sectors: each track is one read, done twice, so at least 6.
             let reads = faults.reads
-            check(verify ? "Check for Errors reads more than once" : "without Check for Errors each part is read once",
-                  verify ? reads > 9 : reads == 9, "\(reads) reads")
+            check(verify ? "Check for Errors reads every track at least twice" : "without Check for Errors each part is read once",
+                  verify ? reads >= 6 : reads == 9, "\(reads) reads")
         }
         model.verifyReads = true
         model.eject()
