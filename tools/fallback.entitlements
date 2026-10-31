@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Use ONLY if tools/release.sh reports "Library not loaded" for libmp3lame after signing with your Developer ID.
+     It lets the app load a library that is not signed by the same team, which weakens one safety rule. Normally not needed:
+     the app and libmp3lame are both signed with your team, which the hardened runtime accepts.
+     Use: ENTITLEMENTS=tools/fallback.entitlements tools/release.sh -->
+<plist version="1.0"><dict>
+<key>com.apple.security.cs.disable-library-validation</key><true/>
+</dict></plist>

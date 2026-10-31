@@ -100,6 +100,7 @@ enum SelfTest {
             await polishChecks(model: model, out: out)
             await installerChecks(out: out)
             realDriveChecks()
+            libraryChecks()
             await realBurnCheck(out: out)
             coverPrepChecks()
 
@@ -665,6 +666,41 @@ enum SelfTest {
             position += 8 + size + (size % 2)
         }
         return nil
+    }
+
+    /// LAME must be a separate, replaceable library inside the app (it is LGPL), not code inside the program.
+    /// Checked only when running from a real app bundle, where the library lives.
+    private static func libraryChecks() {
+        let fm = FileManager.default
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
+        func tool(_ path: String, _ args: [String]) -> String {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: path)
+            process.arguments = args
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return "" }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return String(decoding: data, as: UTF8.self)
+        }
+        let library = Bundle.main.bundleURL.appending(path: "Contents/Frameworks/libmp3lame.0.dylib")
+        let program = Bundle.main.executableURL?.path ?? ""
+        check("LAME is a separate library file inside the app", fm.fileExists(atPath: library.path))
+        check("the program links LAME by name, not by copying it in",
+              tool("/usr/bin/otool", ["-L", program]).contains("@rpath/libmp3lame.0.dylib"))
+        check("the program holds none of LAME's own code",
+              !tool("/usr/bin/nm", ["-gU", program]).contains(" T _lame_init"))
+        check("the library holds LAME's encoder and no decoder",
+              tool("/usr/bin/nm", ["-gU", library.path]).contains(" T _lame_init")
+              && !tool("/usr/bin/nm", ["-gU", library.path]).lowercased().contains("hip_decode"))
+        let notices = Bundle.main.bundleURL.appending(path: "Contents/Resources/Licenses")
+        check("the LGPL licence and the source notice travel inside the app",
+              fm.fileExists(atPath: notices.appending(path: "LICENSE-LAME.txt").path)
+              && fm.fileExists(atPath: notices.appending(path: "LAME-NOTICE.txt").path))
+        check("the finished program carries no path from the developer's Mac",
+              !tool("/usr/bin/otool", ["-l", program]).contains("/Documents/GitHub"))
     }
 
     /// Reads the Mac's real burner through DiscRecordingBurner. Runs only with RIPPLE_REAL_DRIVE=1, and never writes.

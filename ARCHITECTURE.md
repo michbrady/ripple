@@ -5,7 +5,7 @@ A BradysBit app. One window, no database: Ripple saves only settings (UserDefaul
 ## Targets
 
 ```text
-CLame       LAME 3.100 encoder, C, vendored (LGPL). No decoder.
+CLame       Only LAME's header and a "link libmp3lame" note. The library itself is built from vendor/lame by tools/build-lame.sh into .lame/ and shipped inside the app as Contents/Frameworks/libmp3lame.0.dylib (LGPL: a separate, replaceable library). No decoder.
 CDShim      Two ioctls for reading audio CDs (DKIOCCDREADTOC, DKIOCCDREAD), C.
 RippleKit   Plain logic, no SwiftUI. Depends on CLame. Tested by RippleKitTests.
 Ripple      The app: SwiftUI views, DiskArbitration, the app model. Depends on RippleKit and CDShim.
@@ -47,7 +47,7 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 
 ## Shipping
 
-`./build.sh` builds the app into `~/Applications`. `tools/make-dmg.sh` packs it into `website/Ripple.dmg`, the installer: a window with Ripple, an Applications shortcut, and an arrow (`tools/dmg-background.swift` draws the picture; Finder lays out the window). `website/source/build.py` then rebuilds `website/index.html` with the disk image's size and checksum. The app is signed ad hoc and not notarized; see `website/README.md`.
+Before `swift build` or `swift test`, run `tools/build-lame.sh` once. `./build.sh` does it for you, builds the app into `~/Applications`, puts LAME and its licence inside, and signs the library before the app. `tools/make-dmg.sh` packs it into `website/Ripple.dmg`, the installer: a window with Ripple, an Applications shortcut, and an arrow (`tools/dmg-background.swift` draws the picture; Finder lays out the window). `website/source/build.py` then rebuilds `website/index.html` with the disk image's size and checksum. The app is signed ad hoc and not notarized; see `website/README.md`.
 
 ## Checks
 

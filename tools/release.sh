@@ -30,6 +30,17 @@ codesign -dv "$app" 2>&1 | grep -q "runtime" || die "the hardened runtime is not
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# Does the signed app really start and make MP3s? Under the hardened runtime an app may only load libraries signed by
+# Apple or by the same team, and LAME is a separate library. Find out now, not after Apple has the file.
+run_selftest() {
+  local result
+  result=$(APP_STORE="$work/self.store" "$app/Contents/MacOS/Ripple" --selftest 2>&1 | tail -3 | tr '\n' ' ')
+  [[ "$result" == *"SELFTEST PASS"* ]] || die "the signed app failed its own self-test: $result
+If this says \"Library not loaded\" for libmp3lame, sign again with the fallback: ENTITLEMENTS=tools/fallback.entitlements tools/release.sh"
+  print "the signed app passes its self-test."
+}
+run_selftest
+
 # Sends a file to Apple and waits. Stops with Apple's own explanation if it is not accepted.
 notarize() {
   local file=$1 json status id
@@ -50,6 +61,7 @@ ditto -c -k --keepParent "$app" "$work/Ripple.zip"
 notarize "$work/Ripple.zip"
 xcrun stapler staple "$app"
 xcrun stapler validate "$app"
+run_selftest   # once more with Apple's ticket attached
 
 # 4. Pack the stapled app into the installer, sign that, notarize it, and staple it.
 SIGN_IDENTITY="$identity" tools/make-dmg.sh

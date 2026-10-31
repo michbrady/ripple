@@ -52,6 +52,11 @@ If Apple says no, the script prints Apple's own explanation and stops.
 
 - **Hardened runtime.** Notarization requires it. Ripple passes its whole self-test under it. Reading and burning real
   discs under it still need one check on real hardware (the drive was unplugged when this was set up).
-- **LAME is a licence matter, not a signing one.** LAME is compiled into the app under the LGPL. Before real distribution,
-  either offer the means to relink it or build it as a separate library inside the app.
+- **LAME is a separate library inside the app** (Contents/Frameworks/libmp3lame.0.dylib), which is what the LGPL asks for.
+  Its licence and a source notice are in Contents/Resources/Licenses, and the About window and web page say so.
+- **The hardened runtime only loads libraries signed by Apple or the same team.** With your Developer ID both Ripple and
+  libmp3lame carry your team, so it should load. An ad hoc signature has no team, so `HARDENED=1 ./build.sh` on its own
+  makes the app fail to start with "Library not loaded": that is expected and only affects that test. `tools/release.sh` runs
+  the app's self-test from the signed app and stops if it fails. If it ever says "Library not loaded" with your real certificate,
+  use the fallback it names: `ENTITLEMENTS=tools/fallback.entitlements tools/release.sh`.
 - **Bundle identifier.** It is `com.michael.ripple`. Changing it later resets people's saved settings.

@@ -21,6 +21,7 @@ if [[ -z "$identity" ]]; then
 fi
 [[ -n "$identity" ]] || identity=-
 
+"$here/tools/build-lame.sh"   # LAME is a separate library inside the app (LGPL)
 swift build -c $config --package-path "$here" --scratch-path "$scratch" 2>&1 | grep -E "error|warning|Build complete" | grep -v "^\[" || true
 bin="$scratch/$config/$name"
 [[ -x "$bin" ]] || { echo "build failed"; exit 1; }
@@ -37,6 +38,12 @@ mkdir -p "$HOME/Applications"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/$name"
+# LAME goes in as its own file, next to the program, with its licence and notice.
+mkdir -p "$app/Contents/Frameworks" "$app/Contents/Resources/Licenses"
+cp "$here/.lame/libmp3lame.0.dylib" "$app/Contents/Frameworks/"
+cp "$here/vendor/lame/LICENSE-LAME.txt" "$here/vendor/lame/LAME-NOTICE.txt" "$app/Contents/Resources/Licenses/"
+# The build links a path on this Mac so `swift run` works; a finished app must not carry it.
+install_name_tool -delete_rpath "$here/.lame" "$app/Contents/MacOS/$name" 2>/dev/null || true
 sed -e "s/__BUILD__/$(date +%Y%m%d%H%M)/" "$here/Info.plist.in" > "$app/Contents/Info.plist"
 # The icon: Icon/AppIcon.icon -> Resources/Assets.car + AppIcon.icns, rebuilt when it changed.
 if [[ -d "$here/Icon/AppIcon.icon" ]]; then
@@ -52,7 +59,11 @@ xattr -cr "$app"
 flags=()
 if [[ "$identity" == Developer\ ID* || "${HARDENED:-}" == 1 ]]; then flags=(--options runtime --timestamp); fi
 [[ "$identity" == "-" ]] && flags=(${flags:#--timestamp})   # an ad hoc signature cannot be timestamped
-codesign --force "${flags[@]}" --sign "$identity" "$app" 2>&1 | grep -v "replacing existing signature" || true
+# Sign the library first, then the app that holds it.
+codesign --force "${flags[@]}" --sign "$identity" "$app/Contents/Frameworks/libmp3lame.0.dylib" 2>&1 | grep -v "replacing existing signature" || true
+ents=()
+[[ -n "${ENTITLEMENTS:-}" ]] && ents=(--entitlements "$ENTITLEMENTS")   # see tools/fallback.entitlements
+codesign --force "${flags[@]}" "${ents[@]}" --sign "$identity" "$app" 2>&1 | grep -v "replacing existing signature" || true
 echo "installed $app (signed: ${identity})"
 
 if [[ " $* " == *" --open "* ]]; then

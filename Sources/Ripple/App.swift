@@ -115,7 +115,8 @@ enum AboutPanel {
         let bold: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: 11), .foregroundColor: NSColor.labelColor]
         credits.append(NSAttributedString(string: "A BradysBit app\n\n", attributes: bold))
         credits.append(NSAttributedString(string: """
-            MP3 encoding by LAME 3.100, used under the GNU LGPL (lame.sourceforge.io). \
+            MP3 encoding by LAME 3.100, used under the GNU LGPL (lame.sourceforge.io), as a separate library you can replace. \
+            The licence and source notice are in the app's Resources/Licenses folder. \
             Album details from MusicBrainz. Cover pictures from the Cover Art Archive and the iTunes Search API.
             """, attributes: body))
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])

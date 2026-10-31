@@ -1,0 +1,7 @@
+// Tells Swift about LAME's header and to link libmp3lame, which tools/build-lame.sh builds into .lame/.
+// LAME is a separate library inside the app (LGPL); its source is in vendor/lame.
+module CLame [system] {
+    header "lame.h"
+    link "mp3lame"
+    export *
+}
