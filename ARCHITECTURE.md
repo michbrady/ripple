@@ -45,6 +45,10 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 - `ContentView`: window, album header, cover, track list, bottom bar, match picker.
 - `Snapshot`, `SelfTest`: agent modes (`tools/snap.sh`, `tools/selftest.sh`). Both refuse to run unless `APP_STORE` is set, and then use a settings store that is emptied at launch, so they never touch real settings and never leak into each other.
 
+## Shipping
+
+`./build.sh` builds the app into `~/Applications`. `tools/make-dmg.sh` packs it into `website/Ripple.dmg`, the installer: a window with Ripple, an Applications shortcut, and an arrow (`tools/dmg-background.swift` draws the picture; Finder lays out the window). `website/source/build.py` then rebuilds `website/index.html` with the disk image's size and checksum. The app is signed ad hoc and not notarized; see `website/README.md`.
+
 ## Checks
 
 `swift test` (RippleKit), `tools/selftest.sh` (the app's own functions on a fixture disc), `tools/snap.sh` (every page, light and dark), `tools/grid-lint.sh`.

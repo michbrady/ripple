@@ -162,10 +162,10 @@
       <h1>Turn your CDs into MP3s, named properly.</h1>
       <p class="lead">Put in a disc. Ripple copies the tracks to MP3 or M4A files on your Mac, finds the album, the song titles, and the cover, and names every file after its song. It can burn MP3s back to a disc too.</p>
       <div class="actions">
-        <a class="btn primary" href="Ripple.zip" download>Download for Mac</a>
+        <a class="btn primary" href="Ripple.dmg" download>Download for Mac</a>
         <a class="btn" href="#how">See how it works</a>
       </div>
-      <p class="note">Version 0.1 &middot; {{ZIP_SIZE}} &middot; macOS 26 or later, Apple silicon &middot; <a href="#install">How to open it the first time</a></p>
+      <p class="note">Version 0.1 &middot; {{DL_SIZE}} &middot; macOS 26 or later, Apple silicon &middot; <a href="#install">How to open it the first time</a></p>
 
       <figure class="shot">
         <picture>
@@ -238,17 +238,21 @@
       <h2>Download</h2>
       <p class="sub">Ripple 0.1 is free to try. It is an early version.</p>
       <div class="actions" style="justify-content:flex-start;margin-bottom:1.5rem">
-        <a class="btn primary" href="Ripple.zip" download>Download Ripple for Mac</a>
-        <span class="note" style="margin:0;align-self:center">Ripple.zip &middot; {{ZIP_SIZE}}</span>
+        <a class="btn primary" href="Ripple.dmg" download>Download Ripple for Mac</a>
+        <span class="note" style="margin:0;align-self:center">Ripple.dmg &middot; {{DL_SIZE}}</span>
       </div>
       <ol class="steps">
-        <li><h3>Unzip it</h3><p>Open <code>Ripple.zip</code> and drag <b>Ripple</b> into your Applications folder.</p></li>
-        <li><h3>Open it</h3><p>macOS will say it cannot check Ripple for malware, because this early version is not notarized by Apple yet.</p></li>
-        <li><h3>Allow it once</h3><p>Open <b>System Settings</b>, choose <b>Privacy &amp; Security</b>, scroll to Security, and choose <b>Open Anyway</b> next to Ripple. You only do this the first time.</p></li>
+        <li><h3>Open the download</h3><p>Double-click <code>Ripple.dmg</code>. A window opens with Ripple and your Applications folder.</p></li>
+        <li><h3>Drag Ripple across</h3><p>Drag <b>Ripple</b> onto <b>Applications</b>, as the arrow shows. Then eject the disk image.</p></li>
+        <li><h3>Open it once</h3><p>Open Ripple from Applications. macOS will say it cannot check Ripple for malware, because this early version is not notarized by Apple yet. Open <b>System Settings</b>, choose <b>Privacy &amp; Security</b>, scroll to Security, and choose <b>Open Anyway</b>. You only do this the first time.</p></li>
       </ol>
+      <figure class="shot" style="margin-top:1.5rem;max-width:34rem">
+        <img src="{{INSTALLER}}" width="1000" height="667" loading="lazy" alt="The install window: the Ripple icon, an arrow, and the Applications folder, with the words Drag Ripple to the Applications folder.">
+        <figcaption>The install window.</figcaption>
+      </figure>
       <div class="notice">
-        <p><b>Check your download.</b> In Terminal, run <code>shasum -a 256 Ripple.zip</code>. The result should be:</p>
-        <p class="sha">{{ZIP_SHA}}</p>
+        <p><b>Check your download.</b> In Terminal, run <code>shasum -a 256 Ripple.dmg</code>. The result should be:</p>
+        <p class="sha">{{DL_SHA}}</p>
       </div>
     </div>
   </section>

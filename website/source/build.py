@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds ../index.html from page.html: inlines the screenshots and fills in the download's size and checksum.
 
-Usage: python3 website/source/build.py     (run from the repo root; website/Ripple.zip must exist)
+Usage: python3 website/source/build.py     (run from the repo root; website/Ripple.dmg must exist)
 """
 import base64, hashlib, os, urllib.parse
 
@@ -21,16 +21,17 @@ def image(name):
     with open(os.path.join(here, "shots", name + ".png"), "rb") as f:
         return "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
-zip_path = os.path.join(site, "Ripple.zip")
-data = open(zip_path, "rb").read()
+dmg_path = os.path.join(site, "Ripple.dmg")
+data = open(dmg_path, "rb").read()
 size_mb = len(data) / 1_000_000
 
 page = open(os.path.join(here, "page.html")).read()
 fills = {
     "FAVICON": urllib.parse.quote(logo.replace("\n", ""), safe=""),
     "LOGO": logo,
-    "ZIP_SIZE": f"{size_mb:.1f} MB",
-    "ZIP_SHA": hashlib.sha256(data).hexdigest(),
+    "DL_SIZE": f"{size_mb:.1f} MB",
+    "DL_SHA": hashlib.sha256(data).hexdigest(),
+    "INSTALLER": image("installer"),
     "TRACKS_LIGHT": image("tracks-light"), "TRACKS_DARK": image("tracks-dark"),
     "PICKER_LIGHT": image("picker-light"), "PICKER_DARK": image("picker-dark"),
     "BURN_LIGHT": image("burn-list-light"), "BURN_DARK": image("burn-list-dark"),
@@ -40,4 +41,4 @@ for key, value in fills.items():
 assert "{{" not in page, "an unfilled placeholder is left"
 out = os.path.join(site, "index.html")
 open(out, "w").write(page)
-print(f"wrote {out} ({len(page) // 1024} KB); Ripple.zip is {fills['ZIP_SIZE']}, sha256 {fills['ZIP_SHA'][:16]}...")
+print(f"wrote {out} ({len(page) // 1024} KB); Ripple.dmg is {fills['DL_SIZE']}, sha256 {fills['DL_SHA'][:16]}...")
