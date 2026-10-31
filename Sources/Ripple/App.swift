@@ -128,7 +128,7 @@ enum Burners {
     static func make() -> any DiscBurner {
         let env = ProcessInfo.processInfo.environment
         if env["APP_FIXTURE_DISC"] == "1" || env["APP_BURN_FIXTURE"] == "1" || Store.isOverridden {
-            return FixtureBurner(state: FixtureBurner.blankCD())
+            return FixtureBurner(deviceName: "USB Burner", state: FixtureBurner.blankCD())
         }
         return DiscRecordingBurner()
     }

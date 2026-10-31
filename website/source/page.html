@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Tell the browser both themes are supported before it paints, to avoid a flash of the wrong one. -->
+<meta name="color-scheme" content="light dark">
+<title>Ripple, a CD ripper and burner for Mac | BradysBit</title>
+<meta name="description" content="Ripple turns audio CDs into MP3 or M4A files on your Mac, looks up the album and cover, names every file after its song, and burns MP3s back to a disc. A BradysBit app.">
+<meta property="og:title" content="Ripple, a CD ripper for Mac">
+<meta property="og:description" content="Turn your CDs into MP3s, named properly. Burn MP3s to a disc. A BradysBit app.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.bradysbit.com/ripple/">
+<link rel="canonical" href="https://www.bradysbit.com/ripple/">
+<link rel="icon" href="data:image/svg+xml,{{FAVICON}}">
+<style>
+  :root {
+    /* Raw colors, one pair per token. The page picks the pair that matches the viewer's setting. */
+    --bg-light: #fbfcfd;        --bg-dark: #0f1417;
+    --surface-light: #ffffff;   --surface-dark: #172026;
+    --text-light: #14202a;      --text-dark: #e8eef2;
+    --muted-light: #4d5f6b;     --muted-dark: #9fb0bb;
+    --line-light: #dbe3e8;      --line-dark: #27343c;
+    --accent-light: #0b7a99;    --accent-dark: #52cdea;
+    --on-accent-light: #ffffff; --on-accent-dark: #06222b;
+
+    /* Fallback for browsers without light-dark(). */
+    --bg: var(--bg-light);
+    --surface: var(--surface-light);
+    --text: var(--text-light);
+    --muted: var(--muted-light);
+    --line: var(--line-light);
+    --accent: var(--accent-light);
+    --on-accent: var(--on-accent-light);
+    @media (prefers-color-scheme: dark) {
+      --bg: var(--bg-dark);
+      --surface: var(--surface-dark);
+      --text: var(--text-dark);
+      --muted: var(--muted-dark);
+      --line: var(--line-dark);
+      --accent: var(--accent-dark);
+      --on-accent: var(--on-accent-dark);
+    }
+    @supports (color: light-dark(white, black)) {
+      --bg: light-dark(var(--bg-light), var(--bg-dark));
+      --surface: light-dark(var(--surface-light), var(--surface-dark));
+      --text: light-dark(var(--text-light), var(--text-dark));
+      --muted: light-dark(var(--muted-light), var(--muted-dark));
+      --line: light-dark(var(--line-light), var(--line-dark));
+      --accent: light-dark(var(--accent-light), var(--accent-dark));
+      --on-accent: light-dark(var(--on-accent-light), var(--on-accent-dark));
+    }
+
+    color-scheme: light dark;
+    accent-color: var(--accent);
+    --gutter: clamp(1rem, 4vw, 2rem);
+    --radius: 0.75rem;
+    --measure: 72rem;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 1rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { width: min(100% - 2 * var(--gutter), var(--measure)); margin-inline: auto; }
+  a { color: var(--accent); text-underline-offset: 0.2em; }
+  a:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 0.25rem; }
+  img { max-width: 100%; height: auto; display: block; }
+  code { font: 0.92em ui-monospace, "SF Mono", Menlo, monospace; background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 0.1em 0.4em; border-radius: 0.3em; }
+
+  /* Header */
+  header { padding-block: 1.25rem; }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit; }
+  .brand svg { width: 2.5rem; height: 2.5rem; flex: none; }
+  .brand b { font-size: 1.25rem; letter-spacing: -0.01em; display: block; line-height: 1.1; }
+  .brand small { color: var(--muted); font-size: 0.8rem; display: block; }
+  nav { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+  nav a { color: var(--muted); text-decoration: none; font-weight: 500; }
+  nav a:hover { color: var(--text); }
+
+  /* Hero */
+  .hero { padding-block: clamp(2rem, 7vw, 5rem) clamp(1.5rem, 4vw, 3rem); text-align: center; }
+  .eyebrow { display: inline-block; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 0.25rem 0.9rem; font-size: 0.85rem; margin-bottom: 1.25rem; }
+  h1 { font-size: clamp(2.2rem, 6vw, 4rem); line-height: 1.08; letter-spacing: -0.03em; margin: 0 auto 1rem; max-width: 18ch; text-wrap: balance; }
+  .lead { font-size: clamp(1.05rem, 2.2vw, 1.3rem); color: var(--muted); max-width: 40rem; margin: 0 auto 2rem; text-wrap: pretty; }
+  .actions { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.4rem; border-radius: 0.65rem; font-weight: 600; text-decoration: none; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+  .btn[aria-disabled="true"] { opacity: 0.65; cursor: not-allowed; }
+  .note { color: var(--muted); font-size: 0.9rem; margin-top: 0.9rem; }
+
+  .shot { margin: clamp(2rem, 5vw, 3.5rem) auto 0; max-width: 56rem; }
+  .shot img { border-radius: 0.9rem; box-shadow: 0 1.5rem 3rem -1rem rgb(0 0 0 / 0.35), 0 0 0 1px var(--line); aspect-ratio: 1400 / 916; }
+  figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 0.75rem; }
+
+  /* Sections */
+  section { padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+  h2 { font-size: clamp(1.6rem, 3.5vw, 2.3rem); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 0.5rem; text-wrap: balance; }
+  .sub { color: var(--muted); max-width: 40rem; margin: 0 0 2rem; }
+
+  .steps { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); counter-reset: step; padding: 0; list-style: none; margin: 0; }
+  .steps li { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem; counter-increment: step; }
+  .steps li::before { content: counter(step); display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 700; margin-bottom: 0.75rem; }
+  .steps h3, .grid h3 { margin: 0 0 0.35rem; font-size: 1.1rem; }
+  .steps p, .grid p { margin: 0; color: var(--muted); }
+
+  .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem; }
+
+  .split { display: grid; gap: clamp(1.5rem, 4vw, 3rem); grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); align-items: center; }
+  .split img { border-radius: 0.9rem; box-shadow: 0 1rem 2.5rem -1rem rgb(0 0 0 / 0.35), 0 0 0 1px var(--line); }
+
+  .soon { padding: 0; list-style: none; margin: 0; display: grid; gap: 0.75rem; }
+  .soon li { background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .soon b { display: block; }
+  .soon span { color: var(--muted); }
+
+  .band { background: var(--surface); border-block: 1px solid var(--line); }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.5rem 1.5rem; margin: 0; }
+  dt { font-weight: 600; }
+  dd { margin: 0; color: var(--muted); }
+  @media (max-width: 34rem) { dl { grid-template-columns: 1fr; gap: 0.1rem; } dd { margin-bottom: 0.75rem; } }
+
+  .install { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+  .notice { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 1rem 1.25rem; margin-top: 1.25rem; }
+  .notice p { margin: 0 0 0.5rem; } .notice p:last-child { margin: 0; }
+  .sha { font: 0.8rem/1.4 ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; color: var(--muted); }
+  .list { padding-left: 1.2rem; margin: 0; } .list li { margin-bottom: 0.5rem; color: var(--muted); } .list b { color: var(--text); }
+  footer { padding-block: 2.5rem; color: var(--muted); font-size: 0.9rem; }
+  footer p { margin: 0 0 0.6rem; max-width: 52rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Ripple by BradysBit, back to the top">
+      {{LOGO}}
+      <span><b>Ripple</b><small>by BradysBit</small></span>
+    </a>
+    <nav aria-label="Page">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#install">Download</a>
+      <a href="#requirements">Requirements</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="wrap">
+    <div class="hero">
+      <span class="eyebrow">A BradysBit app &middot; Version 0.1</span>
+      <h1>Turn your CDs into MP3s, named properly.</h1>
+      <p class="lead">Put in a disc. Ripple copies the tracks to MP3 or M4A files on your Mac, finds the album, the song titles, and the cover, and names every file after its song. It can burn MP3s back to a disc too.</p>
+      <div class="actions">
+        <a class="btn primary" href="Ripple.zip" download>Download for Mac</a>
+        <a class="btn" href="#how">See how it works</a>
+      </div>
+      <p class="note">Version 0.1 &middot; {{ZIP_SIZE}} &middot; macOS 26 or later, Apple silicon &middot; <a href="#install">How to open it the first time</a></p>
+
+      <figure class="shot">
+        <picture>
+          <source srcset="{{TRACKS_DARK}}" media="(prefers-color-scheme: dark)">
+          <img src="{{TRACKS_LIGHT}}" width="1400" height="916" alt="The Ripple window showing an album with its cover, eight tracks with titles and lengths, an Output Folder control, an MP3 and M4A switch, and a Rip button.">
+        </picture>
+        <figcaption>The Ripple window, with a made-up test album.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap">
+      <h2>Three steps</h2>
+      <p class="sub">No setup screens and no file name templates to learn.</p>
+      <ol class="steps">
+        <li><h3>Insert a disc</h3><p>Plug in a CD drive and insert an audio disc. Ripple shows its tracks right away.</p></li>
+        <li><h3>Check the details</h3><p>Ripple looks up the album, the artist, the track titles, and the cover. It tells you when a match is only a guess. Fix anything that looks wrong, or pick a different match.</p></li>
+        <li><h3>Rip</h3><p>Press Rip. Your files land in the folder you chose, in <code>Artist/Album</code> folders, named <code>01 - Song Title.mp3</code>.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="features" class="band">
+    <div class="wrap">
+      <h2>What Ripple does</h2>
+      <p class="sub">One window, a few good defaults.</p>
+      <div class="grid">
+        <div class="card"><h3>Finds the album for you</h3><p>Looks the disc up on MusicBrainz, a free community music database, and fetches the cover from the Cover Art Archive. If the disc is not an exact match, Ripple says so and ranks the candidates by how well their track lengths fit.</p></div>
+        <div class="card"><h3>Names files by song title</h3><p>Every file is named after its song. Characters that Macs do not allow in file names are swapped out, so nothing fails halfway.</p></div>
+        <div class="card"><h3>Easy to correct</h3><p>Edit the album, the artist, and any track title. Skip tracks you do not want. Drop your own picture on the cover. Cancel any time: finished tracks stay.</p></div>
+        <div class="card"><h3>Handles tricky discs</h3><p>Several albums match one disc? You choose. Two-disc sets go into <code>Disc 1</code> and <code>Disc 2</code> folders. Compilations put the artist in each file name. Discs with a data session after the music work too.</p></div>
+        <div class="card"><h3>Details inside every file</h3><p>Title, artist, album, year, track and disc numbers, and the cover are written into each file, so other players can show them.</p></div>
+        <div class="card"><h3>MP3 or M4A</h3><p>Choose MP3 (variable or fixed quality, up to 320 kbps) or M4A (AAC at 256 kbps). The choice is saved.</p></div>
+        <div class="card"><h3>Checks for scratches</h3><p>Ripple reads each part of the disc again to make sure the reads agree. A track it cannot read cleanly is still saved, marked Needs Attention, and you can rip just that track again.</p></div>
+        <div class="card"><h3>Burns MP3s to a disc</h3><p>Choose a folder of MP3 files and burn an Audio Disc that plays in any CD player, or an MP3 Disc that holds many hours.</p></div>
+        <div class="card"><h3>Private</h3><p>No account and no tracking. The only thing Ripple sends over the internet is the album and cover lookup, and ripping works without it.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <h2>When a disc matches more than one album, you choose.</h2>
+        <p class="sub" style="margin-bottom:0">Reissues and special editions share the same disc. Ripple picks the closest match first and lets you switch with one click. Anything you typed yourself stays put when you switch.</p>
+      </div>
+      <picture>
+        <source srcset="{{PICKER_DARK}}" media="(prefers-color-scheme: dark)">
+        <img src="{{PICKER_LIGHT}}" width="1000" height="654" loading="lazy" alt="Ripple's Choose Album window listing two matching albums with their year, country, and track count.">
+      </picture>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap split">
+      <picture>
+        <source srcset="{{BURN_DARK}}" media="(prefers-color-scheme: dark)">
+        <img src="{{BURN_LIGHT}}" width="1000" height="654" loading="lazy" alt="Ripple's Burn mode showing a list of six MP3 files, an Audio Disc and MP3 Disc switch, and a capacity bar showing 22 minutes of 79 used.">
+      </picture>
+      <div>
+        <h2>Burn a folder of MP3s to a disc.</h2>
+        <p class="sub" style="margin-bottom:1rem">Choose a folder, drag files into the order you want, and watch the capacity bar. If the files do not fit, Ripple says how much to remove. An <b>Audio Disc</b> plays in any CD player. An <b>MP3 Disc</b> holds many hours, for players that read MP3 files.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <h2>Download</h2>
+      <p class="sub">Ripple 0.1 is free to try. It is an early version.</p>
+      <div class="actions" style="justify-content:flex-start;margin-bottom:1.5rem">
+        <a class="btn primary" href="Ripple.zip" download>Download Ripple for Mac</a>
+        <span class="note" style="margin:0;align-self:center">Ripple.zip &middot; {{ZIP_SIZE}}</span>
+      </div>
+      <ol class="steps">
+        <li><h3>Unzip it</h3><p>Open <code>Ripple.zip</code> and drag <b>Ripple</b> into your Applications folder.</p></li>
+        <li><h3>Open it</h3><p>macOS will say it cannot check Ripple for malware, because this early version is not notarized by Apple yet.</p></li>
+        <li><h3>Allow it once</h3><p>Open <b>System Settings</b>, choose <b>Privacy &amp; Security</b>, scroll to Security, and choose <b>Open Anyway</b> next to Ripple. You only do this the first time.</p></li>
+      </ol>
+      <div class="notice">
+        <p><b>Check your download.</b> In Terminal, run <code>shasum -a 256 Ripple.zip</code>. The result should be:</p>
+        <p class="sha">{{ZIP_SHA}}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <h2>What to know about this early version</h2>
+      <p class="sub">Ripple is new. Here is what has been tried, and what has not.</p>
+      <ul class="list">
+        <li><b>Ripping</b> has been tried on real music CDs with one USB drive, including a disc with a data session. The audio matched the Mac&rsquo;s own copy exactly.</li>
+        <li><b>Burning an MP3 Disc</b> has been tried on a real disc and checked file by file. <b>Burning an Audio Disc</b> has not been tried on a real CD-R yet.</li>
+        <li><b>Check for errors</b> catches reads that fail or disagree. It cannot catch a drive that repeats the same wrong data twice. Stronger checking is planned.</li>
+        <li><b>Not notarized.</b> That is why macOS asks you to allow it. A notarized download is planned.</li>
+        <li>Rip only music you own or have the right to copy.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="requirements">
+    <div class="wrap">
+      <h2>Requirements</h2>
+      <dl>
+        <dt>A Mac</dt><dd>With Apple silicon, running macOS 26 or later.</dd>
+        <dt>A disc drive</dt><dd>Most Macs have no disc drive. A USB CD or DVD drive works. Burning needs a drive that can write discs and a blank disc.</dd>
+        <dt>Internet</dt><dd>Only for the album and cover lookup. You can type the details yourself without it.</dd>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>&copy; 2026 BradysBit.</b> Ripple is a BradysBit app.</p>
+    <p>MP3 encoding by <a href="https://lame.sourceforge.io/">LAME</a> 3.100, used under the GNU LGPL. Album details from <a href="https://musicbrainz.org/">MusicBrainz</a>. Cover pictures from the <a href="https://coverartarchive.org/">Cover Art Archive</a> and the iTunes Search API. Those names belong to their owners, and Ripple is not affiliated with them.</p>
+  </div>
+</footer>
+
+</body>
+</html>
