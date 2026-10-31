@@ -672,10 +672,9 @@ enum SelfTest {
     /// The links the app opens must be secure web addresses on the right site, and the privacy page must sit beside the main page.
     private static func linkChecks() {
         check("the website link is a secure address on bradysbit.com",
-              AppLinks.website.scheme == "https" && AppLinks.website.host == "www.bradysbit.com" && AppLinks.website.path == "/ripple/")
+              AppLinks.website.absoluteString == "https://www.bradysbit.com/ripple/")   // URL.path drops the trailing slash, so compare the whole address
         check("the privacy page is a secure address beside the website",
-              AppLinks.privacy.scheme == "https" && AppLinks.privacy.host == AppLinks.website.host
-              && AppLinks.privacy.path == "/ripple/privacy.html")
+              AppLinks.privacy.absoluteString == AppLinks.website.absoluteString + "privacy.html")
     }
 
     /// LAME must be a separate, replaceable library inside the app (it is LGPL), not code inside the program.
