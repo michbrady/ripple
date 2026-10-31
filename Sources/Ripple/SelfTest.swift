@@ -169,10 +169,22 @@ enum SelfTest {
         check("files that do not fit say so and block the Burn button", isOver && !burn.canBurn && burn.fitMessage?.hasPrefix("Remove ") == true, "\(burn.fitMessage ?? "nil")")
         burner.set(FixtureBurner.blankDVD())
         await wait(until: { burn.deviceState == FixtureBurner.blankDVD() })
-        check("an Audio Disc does not go on a DVD", !burn.canBurn && burn.fitMessage == "An Audio Disc needs a blank CD-R. This disc is a DVD-R.", "\(burn.fitMessage ?? "nil")")
+        check("an Audio CD does not go on a DVD", !burn.canBurn && burn.fitMessage == "An Audio CD needs a blank CD-R. This disc is a DVD-R.", "\(burn.fitMessage ?? "nil")")
         burn.type = .data
         check("an MP3 Disc does go on a DVD", burn.canBurn)
         burn.type = .audio
+
+        // A CD-RW is allowed, with a heads-up: many older players cannot read one.
+        let rewritable = BurnDeviceState.ready(BurnMedia(kind: .cd, label: "CD-RW", blocksFree: 359_847))
+        burner.set(rewritable)
+        await wait(until: { burn.deviceState == rewritable })
+        check("an Audio CD on a CD-RW can burn, with a note about older players", burn.canBurn && burn.compatibilityNote?.contains("CD-R plays in more players") == true, "\(burn.compatibilityNote ?? "nil")")
+        burn.type = .data
+        check("an MP3 Disc on a CD-RW needs no such note", burn.compatibilityNote == nil)
+        burn.type = .audio
+        burner.set(FixtureBurner.blankCD())
+        await wait(until: { burn.deviceState == FixtureBurner.blankCD() })
+        check("a blank CD-R needs no such note", burn.compatibilityNote == nil)
 
         // S-030: the drive and the disc.
         for (state, words) in [(BurnDeviceState.noDrive, "Connect a USB burner"), (.noDisc, "Insert a blank CD-R."),
@@ -183,7 +195,7 @@ enum SelfTest {
             check("the drive line for \(state) says what to do", burn.deviceLine.contains(words) && !burn.canBurn, burn.deviceLine)
         }
 
-        // S-031: burn an Audio Disc. The files go to the burner in list order.
+        // S-031: burn an Audio CD. The files go to the burner in list order.
         burner.set(FixtureBurner.blankCD())
         await wait(until: { burn.canBurn })
         burn.burn()
@@ -191,7 +203,7 @@ enum SelfTest {
         await wait(until: { burn.phase == .done })
         check("the burn finishes", burn.phase == .done)
         let job = burner.jobs.last
-        check("an Audio Disc job carries the files in list order", job?.type == .audio && job?.files == burn.items.map(\.url))
+        check("an Audio CD job carries the files in list order", job?.type == .audio && job?.files == burn.items.map(\.url))
         check("the job names the volume", job?.volumeName == "Mix")
 
         // S-033: burn an MP3 Disc on a DVD.

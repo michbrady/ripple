@@ -40,7 +40,7 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 - `AppModel`: phase (empty, reading, ready, ripping, done, failed), the `AlbumDraft`, the lookup task, the rip task, and the saved settings (Output Folder, format, MP3 quality) in an injected `UserDefaults`.
 - `CoverPrep`: makes a cover JPEG or PNG of a sensible size before it is embedded. Views read it through the environment.
 - `DiscMonitor`: DiskArbitration. Watches for CD media and refuses the system's mount of audio discs while Ripple runs, so Music does not open.
-- `BurnModel` (`Burn/`): burn mode. Source Folder, file list with undo, the disc in the drive (watched), Audio Disc or MP3 Disc, and the burn. `BurnView` draws it. `AppModel.mode` switches between rip and burn.
+- `BurnModel` (`Burn/`): burn mode. Source Folder, file list with undo, the disc in the drive (watched), Audio CD or MP3 Disc, and the burn. `BurnView` draws it. `AppModel.mode` switches between rip and burn.
 - `StoppableJob`: ripping and burning both conform. The quit prompt asks every busy job (`Jobs.busy`).
 - `ContentView`: window, album header, cover, track list, bottom bar, match picker.
 - `Snapshot`, `SelfTest`: agent modes (`tools/snap.sh`, `tools/selftest.sh`). Both refuse to run unless `APP_STORE` is set, and then use a settings store that is emptied at launch, so they never touch real settings and never leak into each other.

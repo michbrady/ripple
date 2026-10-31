@@ -154,6 +154,9 @@ struct CapacityBar: View {
                 }
             }
             .font(.callout)
+            if let note = burn.compatibilityNote {
+                Label(note, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
+            }
         }
     }
 }
@@ -186,7 +189,7 @@ struct BurnBar: View {
                 .foregroundStyle(burn.isReady ? Color.secondary : Surface.warning)
             Text(burn.deviceLine).lineLimit(2)
             Spacer()
-            Button(burn.type == .audio ? "Burn Audio Disc" : "Burn MP3 Disc") { burn.burn() }
+            Button(burn.type == .audio ? "Burn Audio CD" : "Burn MP3 Disc") { burn.burn() }
                 .keyboardShortcut(.defaultAction)
                 .disabled(!burn.canBurn)
                 .help(burn.canBurn ? "Burn the files to the disc" : "Insert a blank disc and make the files fit to burn")

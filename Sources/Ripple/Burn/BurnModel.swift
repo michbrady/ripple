@@ -95,6 +95,12 @@ final class BurnModel: StoppableJob {
         }
     }
 
+    /// A heads-up that does not stop the burn: a CD-RW will not play in many older players.
+    var compatibilityNote: String? {
+        guard type == .audio, case .ready(let media) = deviceState, media.label == "CD-RW" else { return nil }
+        return "Many older CD players cannot read CD-RW discs. A blank CD-R plays in more players."
+    }
+
     var volumeName: String {
         let name = sourceFolder?.lastPathComponent ?? ""
         return name.isEmpty ? "MP3 Disc" : name

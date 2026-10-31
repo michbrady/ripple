@@ -353,7 +353,7 @@ Acceptance:
 - [snap] The done page says the disc is ready and ejects it.
 - [manual] The disc plays all tracks in order in a CD player.
 Status: doing
-Note: The real write path works for an MP3 Disc (see S-033). An Audio Disc has not been burned: it needs a blank CD-R (or CD-RW), and a person to play the result in a CD player. The progress shown during the first real burn was 'Finishing...' for about four minutes (a DVD-R finalizes slowly); set RIPPLE_BURN_DEBUG=1 to log the framework's real states on the next burn.
+Note: Renamed from "Audio Disc" to "Audio CD". Checked without a disc: DiscRecording builds a standard CD-audio track from an MP3 (2,352-byte audio blocks, audio data form, the standard 2-second gap, 600 blocks for 8 s), and also converts a 48 kHz mono WAV and a 22 kHz mono AAC to the same format, so MP3s of any rate or channel count work. The disc is closed after burning. A CD-RW gets a heads-up that many older players cannot read it. Not yet done: burn a real Audio CD on a blank CD-R and play it in an old CD player. The real write path works for an MP3 Disc (see S-033). Set RIPPLE_BURN_DEBUG=1 to log the framework's real states on the next burn.
 
 ### S-032 Cancel a burn and handle burn errors
 As the user, I can cancel before the burn starts, and I get a clear message if it fails.
@@ -371,7 +371,7 @@ As the user, I choose "MP3 Disc" to copy the MP3 files onto the disc unchanged, 
 Screens: 10-burn-list
 Depends: S-031
 Acceptance:
-- [snap] A control next to Burn offers "Audio Disc" (plays in any player, about 80 minutes) and "MP3 Disc" (holds many hours, needs a player that reads MP3 files), with one line under each.
+- [snap] A control next to Burn offers "Audio CD" (plays in any player, about 80 minutes) and "MP3 Disc" (holds many hours, needs a player that reads MP3 files), with one line under each.
 - [unit] For an MP3 Disc the capacity bar counts file sizes against the blank's megabytes, not minutes.
 - [self] The fixture burn target receives the original MP3 files byte for byte, with the folder layout kept.
 - [manual] The disc mounts on a Mac and the MP3 files play from it.

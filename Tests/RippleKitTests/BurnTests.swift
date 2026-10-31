@@ -134,7 +134,7 @@ import Testing
 
     @Test func anAudioDiscDoesNotFitOnADVD() {
         let plan = BurnPlan(items: [Self.item(60)], type: .audio)
-        #expect(plan.fit(on: FixtureBurner.blankDVD()) == .wrongMedia("An Audio Disc needs a blank CD-R. This disc is a DVD-R."))
+        #expect(plan.fit(on: FixtureBurner.blankDVD()) == .wrongMedia("An Audio CD needs a blank CD-R. This disc is a DVD-R."))
     }
 
     @Test func anMP3DiscFitsOnADVDAndCountsMegabytes() {

@@ -13,7 +13,7 @@ Apple Music's Import CD (no error warning, "Track 01" when lookup fails) and XLD
 1. Insert a disc and see its tracks, album, artist, and cover art, filled in automatically.
 2. Pick MP3 or M4A, pick a folder, and rip. Files land as `Artist/Album/01 - Title.ext` with tags and cover art embedded.
 3. Fix details when the lookup is wrong or empty: choose another match or edit any field before ripping.
-4. Burn: put a blank disc in the drive, choose a folder on the Mac, and burn its MP3 files. Two disc types: Audio Disc (plays in any player) and MP3 Disc (the files copied as they are). Added by the user after the first brief.
+4. Burn: put a blank disc in the drive, choose a folder on the Mac, and burn its MP3 files. Two disc types: Audio CD (the standard CD format: plays in old CD players) and MP3 Disc (the files copied as they are). Added by the user after the first brief.
 
 ## Data
 - Disc: table of contents, disc ID, drive, state (reading, ready, ripping, done).

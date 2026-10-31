@@ -2,16 +2,16 @@ import Foundation
 
 /// The two kinds of disc Ripple burns.
 public enum DiscType: String, CaseIterable, Identifiable, Sendable {
-    /// Plays in any CD player. The MP3 files are turned into CD audio.
+    /// A standard audio CD: it plays in old CD players, car stereos, and boom boxes. The MP3 files are turned into CD audio.
     case audio
     /// The MP3 files copied as they are. Holds many hours, but only some players read it.
     case data
 
     public var id: String { rawValue }
-    public var title: String { self == .audio ? "Audio Disc" : "MP3 Disc" }
+    public var title: String { self == .audio ? "Audio CD" : "MP3 Disc" }
     public var summary: String {
         switch self {
-        case .audio: "Plays in any CD player. Holds about 80 minutes."
+        case .audio: "Standard audio CD. Plays in old CD players, car stereos, and boom boxes. Holds about 80 minutes."
         case .data: "Holds many hours. Needs a player that reads MP3 files."
         }
     }
@@ -94,7 +94,7 @@ public struct BurnPlan: Equatable, Sendable {
     public func fit(on state: BurnDeviceState) -> Fit {
         guard !items.isEmpty else { return .nothingToBurn }
         if case .ready(let media) = state, type == .audio, media.kind != .cd {
-            return .wrongMedia("An Audio Disc needs a blank CD-R. This disc is a \(media.label).")
+            return .wrongMedia("An Audio CD needs a blank CD-R. This disc is a \(media.label).")
         }
         let over = blocksNeeded - capacityBlocks(on: state)
         return over > 0 ? .over(blocks: over) : .fits

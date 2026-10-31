@@ -9,7 +9,7 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | Album | The title, artist, year, and cover that belong to a disc | release (except in the match picker), record |
 | Rip | Copy a disc's tracks to files on the Mac | import, extract, convert, grab |
 | Burn | Write tracks onto a blank disc | record, write |
-| Audio Disc | A burned disc that plays in any CD player (MP3s converted to disc audio) | music CD, Red Book |
+| Audio CD | A burned disc in the standard audio CD format: it plays in old CD players, car stereos, and boom boxes (MP3s converted to CD audio) | Audio Disc, music CD, Red Book |
 | MP3 Disc | A burned disc holding the MP3 files unchanged | data CD, MP3 CD |
 | Mode | Rip or Burn: what the window is for | tab, page |
 | Source Folder | The Mac folder whose MP3 files get burned | input folder, library |
