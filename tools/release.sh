@@ -25,7 +25,9 @@ print "notarizing with the saved login: $profile"
 SIGN_IDENTITY="$identity" ./build.sh
 app="$HOME/Applications/Ripple.app"
 codesign --verify --deep --strict "$app"
-codesign -dv "$app" 2>&1 | grep -q "runtime" || die "the hardened runtime is not on: Apple would reject this."
+# Read the whole output first: `codesign | grep -q` can fail under pipefail when grep quits early.
+signature=$(codesign -dv "$app" 2>&1)
+[[ "$signature" == *"(runtime)"* ]] || die "the hardened runtime is not on: Apple would reject this."
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

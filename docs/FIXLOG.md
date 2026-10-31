@@ -65,3 +65,10 @@ Symptom: A title with a tab came out as "HiddenSong", not "Hidden Song".
 Cause: The cleaner deleted control characters before it treated whitespace as a separator, and a tab is both.
 Fix: Whitespace becomes a space first; only other control characters are dropped.
 Rule: Turn whitespace into spaces before stripping control characters.
+
+## The release script rejected a correctly signed app (M6, found on the first real release)
+Symptom: tools/release.sh stopped with "the hardened runtime is not on", but `codesign -dv` showed the app signed with it.
+Cause: The check was `codesign -dv "$app" 2>&1 | grep -q runtime` under `set -o pipefail`. `grep -q` quits at its first match, which can kill `codesign` while it is still printing; the pipeline then reports failure although the text matched.
+Fix: Read the whole output into a variable, then test it.
+Rule: Never end a pipeline in `grep -q` in a script that uses pipefail. Capture the output, then match it.
+(The "timestamps differ by 181 seconds" warning in the same run was only codesign waiting for the keychain prompt to be approved.)
