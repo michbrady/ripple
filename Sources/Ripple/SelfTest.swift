@@ -675,6 +675,7 @@ enum SelfTest {
               AppLinks.website.absoluteString == "https://www.bradysbit.com/ripple/")   // URL.path drops the trailing slash, so compare the whole address
         check("the privacy page is a secure address beside the website",
               AppLinks.privacy.absoluteString == AppLinks.website.absoluteString + "privacy.html")
+        check("the tip link is the Ko-fi page", AppLinks.tip.absoluteString == "https://ko-fi.com/bradysbit")
     }
 
     /// LAME must be a separate, replaceable library inside the app (it is LGPL), not code inside the program.

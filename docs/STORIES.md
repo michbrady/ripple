@@ -446,7 +446,7 @@ Acceptance:
 - [self] The website link is a secure address on bradysbit.com, and the privacy page is a secure address beside it.
 - [manual] Help > Ripple Website and Help > Privacy and Terms open those pages in the browser; the About window shows both as links.
 Status: done
-Note: Ripple is free. The web page carries a Ko-fi tip link and a privacy and terms page that says what the app sends (a disc lookup to MusicBrainz, the Cover Art Archive, and Apple's iTunes Search) and what it keeps (nothing but settings on the Mac). Add a contact address to the privacy page when there is one.
+Note: Ripple is free. The web page carries a Ko-fi tip link and a privacy and terms page that says what the app sends (a disc lookup to MusicBrainz, the Cover Art Archive, and Apple's iTunes Search) and what it keeps (nothing but settings on the Mac). The Help menu and About window also link to the Ko-fi tip page; the app never asks for a tip on its own. Add a contact address to the privacy page when there is one.
 
 ## Dropped
 - Accounts, sync, sharing, and teams: Ripple has one user and no server.

@@ -32,6 +32,8 @@ struct RippleApp: App {
             CommandGroup(replacing: .help) {
                 Button("Ripple Website") { NSWorkspace.shared.open(AppLinks.website) }
                 Button("Privacy and Terms") { NSWorkspace.shared.open(AppLinks.privacy) }
+                Divider()
+                Button("Leave a Tip on Ko-fi") { NSWorkspace.shared.open(AppLinks.tip) }
             }
             CommandGroup(replacing: .appInfo) {
                 Button("About Ripple") { AboutPanel.show() }
@@ -130,6 +132,10 @@ enum AboutPanel {
         credits.append(NSAttributedString(string: "  \u{00B7}  ", attributes: body))
         credits.append(NSAttributedString(string: "Privacy and terms", attributes: [
             .font: NSFont.systemFont(ofSize: 11), .link: AppLinks.privacy,
+        ]))
+        credits.append(NSAttributedString(string: "  \u{00B7}  ", attributes: body))
+        credits.append(NSAttributedString(string: "Leave a tip", attributes: [
+            .font: NSFont.systemFont(ofSize: 11), .link: AppLinks.tip,
         ]))
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
         NSApp.activate()
