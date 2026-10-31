@@ -71,4 +71,8 @@ hdiutil detach "$mount" -quiet
 mkdir -p "$(dirname "$out")"
 rm -f "$out"
 hdiutil convert "$work/rw.dmg" -format UDZO -imagekey zlib-level=9 -o "$out" >/dev/null
+if [[ -n "${SIGN_IDENTITY:-}" && "$SIGN_IDENTITY" != "-" ]]; then
+  codesign --force --timestamp --sign "$SIGN_IDENTITY" "$out"
+  echo "signed the disk image as: $SIGN_IDENTITY"
+fi
 hdiutil verify "$out" -quiet && echo "built $out ($(du -h "$out" | cut -f1)), verified"

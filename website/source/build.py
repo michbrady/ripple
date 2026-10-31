@@ -3,7 +3,7 @@
 
 Usage: python3 website/source/build.py     (run from the repo root; website/Ripple.dmg must exist)
 """
-import base64, hashlib, os, urllib.parse
+import base64, hashlib, os, subprocess, urllib.parse
 
 here = os.path.dirname(os.path.abspath(__file__))
 site = os.path.dirname(here)
@@ -25,6 +25,22 @@ dmg_path = os.path.join(site, "Ripple.dmg")
 data = open(dmg_path, "rb").read()
 size_mb = len(data) / 1_000_000
 
+# The page says "notarized" only when Apple's ticket is really stapled to this file.
+notarized = subprocess.run(["xcrun", "stapler", "validate", dmg_path], capture_output=True).returncode == 0
+STEP3 = (
+    '<li><h3>Open Ripple</h3><p>Open Ripple from Applications. It is signed and notarized by Apple, so it opens without a warning. '
+    'The first time, macOS may ask you to confirm that it came from the internet: choose <b>Open</b>.</p></li>'
+) if notarized else (
+    '<li><h3>Open it once</h3><p>Open Ripple from Applications. macOS will say it cannot check Ripple for malware, because this early '
+    'version is not notarized by Apple yet. Open <b>System Settings</b>, choose <b>Privacy &amp; Security</b>, scroll to Security, '
+    'and choose <b>Open Anyway</b>. You only do this the first time.</p></li>'
+)
+NOTARY_BULLET = (
+    '<li><b>Signed and notarized.</b> Apple has checked this download for known malicious software.</li>'
+) if notarized else (
+    '<li><b>Not notarized.</b> That is why macOS asks you to allow it. A notarized download is planned.</li>'
+)
+
 page = open(os.path.join(here, "page.html")).read()
 fills = {
     "FAVICON": urllib.parse.quote(logo.replace("\n", ""), safe=""),
@@ -32,6 +48,8 @@ fills = {
     "DL_SIZE": f"{size_mb:.1f} MB",
     "DL_SHA": hashlib.sha256(data).hexdigest(),
     "INSTALLER": image("installer"),
+    "STEP3": STEP3,
+    "NOTARY_BULLET": NOTARY_BULLET,
     "TRACKS_LIGHT": image("tracks-light"), "TRACKS_DARK": image("tracks-dark"),
     "PICKER_LIGHT": image("picker-light"), "PICKER_DARK": image("picker-dark"),
     "BURN_LIGHT": image("burn-list-light"), "BURN_DARK": image("burn-list-dark"),
@@ -41,4 +59,5 @@ for key, value in fills.items():
 assert "{{" not in page, "an unfilled placeholder is left"
 out = os.path.join(site, "index.html")
 open(out, "w").write(page)
+print(f"download is {'signed and NOTARIZED' if notarized else 'not notarized'}")
 print(f"wrote {out} ({len(page) // 1024} KB); Ripple.dmg is {fills['DL_SIZE']}, sha256 {fills['DL_SHA'][:16]}...")

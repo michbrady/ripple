@@ -47,7 +47,12 @@ if [[ -d "$here/Icon/AppIcon.icon" ]]; then
   cp -X "$car" "$here/Resources/AppIcon.icns" "$app/Contents/Resources/"
 fi
 xattr -cr "$app"
-codesign --force --sign "$identity" "$app" 2>&1 | grep -v "replacing existing signature" || true
+# A Developer ID signature needs the hardened runtime and a secure timestamp, or Apple will not notarize it.
+# HARDENED=1 turns the hardened runtime on for any signature, to test it.
+flags=()
+if [[ "$identity" == Developer\ ID* || "${HARDENED:-}" == 1 ]]; then flags=(--options runtime --timestamp); fi
+[[ "$identity" == "-" ]] && flags=(${flags:#--timestamp})   # an ad hoc signature cannot be timestamped
+codesign --force "${flags[@]}" --sign "$identity" "$app" 2>&1 | grep -v "replacing existing signature" || true
 echo "installed $app (signed: ${identity})"
 
 if [[ " $* " == *" --open "* ]]; then
