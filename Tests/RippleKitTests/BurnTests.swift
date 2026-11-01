@@ -300,3 +300,136 @@ import Testing
         #expect(MountedImage.parse(Data()).isEmpty)
     }
 }
+
+@Suite struct BurnM4ATests {
+    /// Writes a real M4A with tags.
+    @discardableResult
+    static func makeM4A(_ url: URL, seconds: Double = 1, tags: TrackTags?) async throws -> URL {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let disc = FixtureDisc(trackSeconds: [seconds])
+        let writer = try M4ATrackWriter(url: url, tags: tags)
+        try writer.write(try disc.readSectors(start: 0, count: disc.toc.leadOut))
+        try await writer.finish()
+        return url
+    }
+
+    @Test func anM4AIsReadWithItsTitleArtistTrackAndLength() async throws {
+        let folder = try BurnScannerTests.folder()
+        let url = try await Self.makeM4A(folder.appending(path: "a.m4a"), seconds: 2,
+                                         tags: TrackTags(title: "Rising", artist: "The Tones", album: "Mix", trackNumber: 7, trackCount: 9))
+        let item = try #require(await BurnScanner.read(url))
+        #expect(item.title == "Rising")
+        #expect(item.artist == "The Tones")
+        #expect(item.trackNumber == 7)
+        #expect(abs(item.seconds - 2) < 0.2)
+        #expect(!item.isMP3)
+    }
+
+    @Test func aFolderOfMP3AndM4AFilesGivesBoth() async throws {
+        let folder = try BurnScannerTests.folder()
+        try BurnScannerTests.makeMP3(folder.appending(path: "01 One.mp3"), tags: TrackTags(title: "One", trackNumber: 1))
+        try await Self.makeM4A(folder.appending(path: "02 Two.m4a"), tags: TrackTags(title: "Two", trackNumber: 2))
+        try Data("x".utf8).write(to: folder.appending(path: "notes.txt"))
+        let scan = await BurnScanner.scan(folder)
+        #expect(scan.items.map(\.title) == ["One", "Two"])
+        #expect(scan.skipped == 1)
+    }
+
+    @Test func subfoldersBecomeFoldersOnTheDisc() async throws {
+        let folder = try BurnScannerTests.folder()
+        try BurnScannerTests.makeMP3(folder.appending(path: "top.mp3"), tags: nil)
+        try BurnScannerTests.makeMP3(folder.appending(path: "Rock/a.mp3"), tags: nil)
+        try BurnScannerTests.makeMP3(folder.appending(path: "Rock/Live/b.mp3"), tags: nil)
+        let scan = await BurnScanner.scan(folder)
+        #expect(Set(scan.items.map(\.folder)) == ["", "Rock", "Rock/Live"])
+    }
+
+    @Test func aDroppedFolderKeepsItsNameAndADroppedFileGoesToTheTop() async throws {
+        let folder = try BurnScannerTests.folder()
+        try BurnScannerTests.makeMP3(folder.appending(path: "Album/a.mp3"), tags: nil)
+        try BurnScannerTests.makeMP3(folder.appending(path: "single.mp3"), tags: nil)
+        let scan = await BurnScanner.scan(dropped: [folder.appending(path: "Album"), folder.appending(path: "single.mp3")])
+        #expect(scan.items.first { $0.url.lastPathComponent == "a.mp3" }?.folder == "Album")
+        #expect(scan.items.first { $0.url.lastPathComponent == "single.mp3" }?.folder == "")
+    }
+
+    @Test func anM4AIsConvertedToAnMP3WithItsTags() async throws {
+        let folder = try BurnScannerTests.folder()
+        let m4a = try await Self.makeM4A(folder.appending(path: "a.m4a"), seconds: 2, tags: TrackTags(title: "Rising", artist: "The Tones", album: "Mix"))
+        let mp3 = folder.appending(path: "out.mp3")
+        try await MP3Converter.convert(m4a, to: mp3)
+        let item = try #require(await BurnScanner.read(mp3))
+        #expect(item.title == "Rising")
+        #expect(item.artist == "The Tones")
+        #expect(abs(item.seconds - 2) < 0.2)
+        // 192 kbps is 24,000 bytes a second, so the size is known before converting.
+        let expected = Int(item.seconds * 24_000)
+        #expect(abs(item.bytes - expected) < expected / 10)
+    }
+
+    @Test func anM4AOnAnMP3DiscCountsItsConvertedSize() {
+        let m4a = BurnItem(url: URL(fileURLWithPath: "/tmp/a.m4a"), title: "a", seconds: 100, bytes: 5, trackNumber: nil)
+        #expect(m4a.discBytes == 2_400_000)
+        let mp3 = BurnItem(url: URL(fileURLWithPath: "/tmp/a.mp3"), title: "a", seconds: 100, bytes: 777)
+        #expect(mp3.discBytes == 777)
+        #expect(BurnPlan(items: [m4a], type: .data).blocksNeeded == (2_400_000 + 2_047) / 2_048 + 600)
+    }
+
+    @Test func prepareConvertsOnlyTheM4AFilesAndCleansUp() async throws {
+        let folder = try BurnScannerTests.folder()
+        let mp3 = try BurnScannerTests.makeMP3(folder.appending(path: "one.mp3"), tags: nil)
+        let m4a = try await Self.makeM4A(folder.appending(path: "two.m4a"), tags: TrackTags(title: "Two"))
+        let job = BurnJob(type: .data, files: [mp3, m4a], volumeName: "Mix", placements: ["", "Rock"], folders: ["Rock"])
+        let entries = DiscLayout.entries(for: job)
+        #expect(entries.map(\.name) == ["01 - one.mp3", "01 - two.mp3"])
+        #expect(entries.map(\.needsConversion) == [false, true])
+        let prepared = try await DiscPreparer.prepare(entries)
+        let work = try #require(prepared.workFolder)
+        #expect(prepared.entries[0].source == mp3)
+        #expect(prepared.entries[1].source.pathExtension == "mp3")
+        #expect(FileManager.default.fileExists(atPath: prepared.entries[1].source.path))
+        try? FileManager.default.removeItem(at: work)
+    }
+
+    @Test func aCancelledPrepareLeavesNothingBehind() async throws {
+        let folder = try BurnScannerTests.folder()
+        let m4a = try await Self.makeM4A(folder.appending(path: "two.m4a"), tags: nil)
+        let entries = DiscLayout.entries(for: BurnJob(type: .data, files: [m4a], volumeName: "Mix"))
+        let task = Task { try await DiscPreparer.prepare(entries) }
+        task.cancel()
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+}
+
+@Suite struct DiscLayoutTests {
+    @Test func filesAreNumberedInsideEachFolder() {
+        let files = ["a", "b", "c"].map { URL(fileURLWithPath: "/m/\($0).mp3") }
+        let job = BurnJob(type: .data, files: files, volumeName: "V", placements: ["Rock", "", "Rock"])
+        let entries = DiscLayout.entries(for: job)
+        #expect(entries.map(\.name) == ["01 - a.mp3", "01 - b.mp3", "02 - c.mp3"])
+        #expect(entries.map(\.folder) == ["Rock", "", "Rock"])
+    }
+
+    @Test func foldersIncludeAncestorsAndEmptyOnes() {
+        let item = BurnItem(url: URL(fileURLWithPath: "/m/a.mp3"), title: "a", seconds: 1, bytes: 1, folder: "Rock/Live")
+        #expect(DiscLayout.allFolders(items: [item], made: ["Jazz"]) == ["Jazz", "Rock", "Rock/Live"])
+    }
+
+    @Test func newFolderNamesAreSafeAndUnique() {
+        #expect(DiscLayout.newFolderName("Rock/Pop: 80s", in: "", existing: []) == "Rock-Pop- 80s")
+        #expect(DiscLayout.newFolderName("Rock", in: "", existing: ["Rock"]) == "Rock (2)")
+        #expect(DiscLayout.newFolderName("Rock", in: "Jazz", existing: ["Rock"]) == "Rock")
+        #expect(DiscLayout.newFolderName("  ", in: "", existing: []) == "Untitled Folder")
+    }
+
+    @Test func pathPartsWork() {
+        #expect(DiscLayout.parent(of: "A/B") == "A")
+        #expect(DiscLayout.parent(of: "A") == "")
+        #expect(DiscLayout.name(of: "A/B") == "B")
+        #expect(DiscLayout.depth(of: "A/B") == 1)
+    }
+
+    @Test func anM4ANameEndsInMP3() {
+        #expect(BurnNaming.discFileName(position: 1, original: URL(fileURLWithPath: "/m/Song.m4a"), fileExtension: "mp3") == "01 - Song.mp3")
+    }
+}

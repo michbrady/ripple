@@ -91,16 +91,27 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
         progress(.preparing)
         guard let device = device() else { throw BurnError.noDisc }
         let layout: Any
+        var workFolder: URL?
+        defer { if let workFolder { try? FileManager.default.removeItem(at: workFolder) } }
         switch job.type {
         case .audio:
             layout = job.files.compactMap { DRTrack(forAudioFile: $0.path) }
         case .data:
+            // M4A files become MP3 in a work folder first. Cancel still works: nothing is written yet.
+            let prepared = try await DiscPreparer.prepare(DiscLayout.entries(for: job))
+            workFolder = prepared.workFolder
             let root = DRFolder(name: String(job.volumeName.prefix(32)))!
-            for (index, file) in job.files.enumerated() {
-                guard let item = DRFile(path: file.path) else { continue }
+            var folders: [String: DRFolder] = ["": root]
+            for path in DiscLayout.allFolders(items: [], made: job.folders + prepared.entries.map(\.folder)) {
+                guard let made = DRFolder(name: DiscLayout.name(of: path)) else { continue }
+                folders[DiscLayout.parent(of: path)]?.addChild(made)
+                folders[path] = made
+            }
+            for entry in prepared.entries {
+                guard let item = DRFile(path: entry.source.path) else { continue }
                 // The number keeps the list order on players that play files by name.
-                item.setBaseName(BurnNaming.discFileName(position: index + 1, of: job.files.count, original: file))
-                root.addChild(item)
+                item.setBaseName(entry.name)
+                (folders[entry.folder] ?? root).addChild(item)
             }
             layout = DRTrack(forRootFolder: root) as Any
         }

@@ -462,3 +462,39 @@ Note: Ripple is free. The web page carries a Ko-fi tip link and a privacy and te
 - Discogs or GnuDB as a second metadata source, and the iTunes Search API for art.
 - Re-tagging existing files and batch library tools.
 - iCloud sync of settings.
+
+### S-036 Burn M4A files
+As the user, I choose a folder of MP3 and M4A files and burn them as an Audio CD.
+Screens: 10-burn-list
+Depends: S-031
+Acceptance:
+- [unit] An M4A is read with its title, artist, track number, and length; a folder of MP3 and M4A files lists both.
+- [self] The list takes M4A files and an Audio CD burns them with no note about conversion.
+- [manual] An Audio CD made from M4A files plays in a CD player.
+Status: doing
+Note: DiscRecording converts AAC to CD audio itself (checked without a disc in S-031). Real burn not yet tried.
+
+### S-037 Burn M4A files as MP3 files
+As the user, on an MP3 Disc my M4A files go on the disc as MP3 files.
+Screens: 10-burn-list
+Depends: S-036, S-033
+Acceptance:
+- [unit] An M4A converts to a real MP3 that keeps title, artist, and length, at 192 kbps (24,000 bytes a second).
+- [unit] The capacity count uses the converted size.
+- [self] A line under the capacity bar says how many M4A files are converted. Converted files are named `01 - Title.mp3`.
+- [self] Cancelling while files convert leaves nothing behind.
+- [manual] The disc mounts and the converted files play.
+Status: done
+Note: Conversion happens in the Preparing stage, in a work folder that is deleted after the burn. Cancel still works then. A real burn with converted files is not yet tried.
+
+### S-038 Folders on an MP3 Disc
+As the user, I make folders on an MP3 Disc and drop files into them.
+Screens: 10-burn-list, 10-burn-folders
+Depends: S-033
+Acceptance:
+- [unit] Files are numbered inside each folder; folder names are made safe and unique; a subfolder of a source folder keeps its place.
+- [self] New Folder, move files in, folder in a folder, rename, remove (files move up), and Undo all work, and the burn job carries each file's folder.
+- [snap] The list shows the top of the disc and each folder with its files.
+- [manual] Dragging a file onto a folder, and a file or folder from Finder onto a folder, puts it there.
+Status: doing
+Note: Drag and drop is not yet tried by hand. The context menu (Move to Folder, Move Up, Move Down) does the same without dragging. An Audio CD has no folders and ignores them.

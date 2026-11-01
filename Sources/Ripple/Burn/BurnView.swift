@@ -2,7 +2,7 @@ import AppKit
 import RippleKit
 import SwiftUI
 
-/// Burn mode: choose a folder of MP3 files, see what fits, and burn.
+/// Burn mode: choose a folder of MP3 or M4A files, see what fits, and burn.
 struct BurnView: View {
     @Environment(BurnModel.self) private var burn
     @Environment(\.undoManager) private var undoManager
@@ -21,7 +21,7 @@ struct BurnView: View {
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard burn.phase == .editing else { return false }
-            Task { await burn.add(dropped: urls) }
+            Task { await burn.drop(urls, into: "") }
             return true
         }
     }
@@ -66,9 +66,9 @@ struct BurnEmpty: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("Choose MP3 Files to Burn", systemImage: "opticaldisc")
+            Label("Choose Music Files to Burn", systemImage: "opticaldisc")
         } description: {
-            Text(burn.isScanning ? "Reading files…" : "Choose a folder of MP3 files, or drop files and folders here.")
+            Text(burn.isScanning ? "Reading files…" : "Choose a folder of MP3 or M4A files, or drop files and folders here.")
         } actions: {
             Button("Choose Folder…") { burn.chooseFolder() }
                 .keyboardShortcut(.defaultAction)
@@ -81,23 +81,32 @@ struct BurnEmpty: View {
 struct BurnEditor: View {
     @Environment(BurnModel.self) private var burn
     @State private var selection = Set<String>()
+    @State private var naming: FolderNaming?
 
     var body: some View {
-        @Bindable var burn = burn
         VStack(spacing: 0) {
             header
             Divider()
-            List(selection: $selection) {
-                ForEach(Array(burn.items.enumerated()), id: \.element.id) { index, item in
-                    BurnRow(number: index + 1, item: item)
-                }
-                .onMove { burn.move(from: $0, to: $1) }
+            if burn.showsFolders {
+                BurnFolderList(selection: $selection, naming: $naming)
+            } else {
+                flatList
             }
-            .listStyle(.plain)
-            .onDeleteCommand {
-                burn.remove(ids: selection)
-                selection = []
+        }
+        .folderNameAlert($naming, burn: burn)
+    }
+
+    private var flatList: some View {
+        List(selection: $selection) {
+            ForEach(Array(burn.items.enumerated()), id: \.element.id) { index, item in
+                BurnRow(number: index + 1, item: item)
             }
+            .onMove { burn.move(from: $0, to: $1) }
+        }
+        .listStyle(.plain)
+        .onDeleteCommand {
+            burn.remove(ids: selection)
+            selection = []
         }
     }
 
@@ -109,13 +118,17 @@ struct BurnEditor: View {
                     Text(burn.volumeName).font(.title2.bold()).lineLimit(1)
                     Text(summary).font(.callout).foregroundStyle(.secondary)
                     if burn.skipped > 0 {
-                        Text("\(burn.skipped) \(burn.skipped == 1 ? "file was" : "files were") skipped because \(burn.skipped == 1 ? "it is" : "they are") not MP3.")
+                        Text("\(burn.skipped) \(burn.skipped == 1 ? "file was" : "files were") skipped because \(burn.skipped == 1 ? "it is" : "they are") not MP3 or M4A.")
                             .font(.callout).foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
+                if burn.type == .data {
+                    Button("New Folder…") { naming = .create(parent: "") }
+                        .help("Make a folder on the disc, then drop files into it")
+                }
                 Button("Choose Folder…") { burn.chooseFolder() }
-                    .help("Choose a different folder of MP3 files")
+                    .help("Choose a different folder of MP3 or M4A files")
             }
             Picker("Disc Type", selection: $burn.type) {
                 ForEach(DiscType.allCases) { Text($0.title).tag($0) }
@@ -154,7 +167,7 @@ struct CapacityBar: View {
                 }
             }
             .font(.callout)
-            if let note = burn.compatibilityNote {
+            ForEach([burn.compatibilityNote, burn.conversionNote].compactMap { $0 }, id: \.self) { note in
                 Label(note, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
             }
         }

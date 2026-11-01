@@ -220,6 +220,92 @@ enum SelfTest {
         burn.tryAgain()
         burn.type = .audio
 
+        // S-036, S-037, S-038: M4A files, conversion to MP3, and folders on an MP3 Disc.
+        let m4aSource = out.appending(path: "burn-m4a", directoryHint: .isDirectory)
+        var m4aRequest = request
+        m4aRequest.folder = m4aSource
+        m4aRequest.format = .m4a
+        m4aRequest.album = "Tunes"
+        _ = try? await Ripper.rip(m4aRequest, onEvent: { _ in })
+        let m4aFolder = m4aSource.appending(path: "The Tones/Tunes", directoryHint: .isDirectory)
+        burn.clear()
+        burn.load(folder: m4aFolder)
+        await wait(until: { !burn.isScanning && !burn.items.isEmpty })
+        check("a folder of M4A files is listed", burn.items.count == 3 && burn.items.allSatisfy { !$0.isMP3 }, "\(burn.items.count)")
+        check("an M4A shows its title and artist", burn.items.map(\.title) == ["One", "Two", "Three"] && burn.items.allSatisfy { $0.artist == "The Tones" }, "\(burn.items.map(\.title))")
+        burn.type = .audio
+        burner.set(FixtureBurner.blankCD())
+        await wait(until: { burn.deviceState == FixtureBurner.blankCD() })
+        check("an Audio CD takes M4A files", burn.conversionNote == nil && burn.fit == .fits)
+        burn.type = .data
+        check("an MP3 Disc says M4A files are converted", burn.conversionNote == "3 M4A files are converted to MP3 when the disc is burned.", "\(burn.conversionNote ?? "nil")")
+        await burn.add(dropped: [folder.appending(path: "01 - One.mp3")])
+        check("MP3 and M4A files mix in one list", burn.items.count == 4 && burn.conversionNote?.hasPrefix("3 M4A") == true, "\(burn.items.count)")
+        // The real conversion: every M4A becomes a real MP3 in a work folder, then the work folder goes away.
+        let entries = DiscLayout.entries(for: BurnJob(type: .data, files: burn.items.map(\.url), volumeName: "Mix"))
+        if let prepared = try? await DiscPreparer.prepare(entries), let work = prepared.workFolder {
+            let converted = prepared.entries.filter { $0.source.deletingLastPathComponent() == work }
+            var readable = 0
+            for entry in converted { if await BurnScanner.read(entry.source) != nil { readable += 1 } }
+            check("M4A files are converted to MP3 files that play", converted.count == 3 && readable == 3 && converted.allSatisfy { $0.source.pathExtension == "mp3" })
+            check("converted files are named like MP3 files", prepared.entries.map(\.name).allSatisfy { $0.hasSuffix(".mp3") }, "\(prepared.entries.map(\.name))")
+            try? fm.removeItem(at: work)
+        } else {
+            check("M4A files are converted to MP3 files that play", false)
+        }
+
+        // Folders: make one, put a file in it, rename it, and the burn job carries the layout.
+        burn.clear()
+        burn.load(folder: folder)
+        await wait(until: { !burn.isScanning && !burn.items.isEmpty })
+        burn.type = .data
+        burn.undoManager = nil
+        check("a flat list shows no folders", !burn.showsFolders)
+        let rock = burn.makeFolder(named: "Rock")
+        check("a new folder appears, empty", rock == "Rock" && burn.folderPaths == ["Rock"] && burn.showsFolders && burn.items(in: "Rock").isEmpty)
+        check("a second folder with the same name gets a number", burn.makeFolder(named: "Rock") == "Rock (2)")
+        burn.removeFolder("Rock (2)")
+        let one = burn.items[0].id
+        let two = burn.items[1].id
+        burn.move(ids: [one, two], toFolder: "Rock")
+        check("files move into a folder", burn.items(in: "Rock").count == 2 && burn.items(in: "").count == 1)
+        let live = burn.makeFolder(named: "Live", in: "Rock")
+        burn.move(ids: [two], toFolder: live)
+        check("a folder can sit inside a folder", live == "Rock/Live" && burn.folderPaths == ["Rock", "Rock/Live"])
+        burn.renameFolder("Rock", to: "Rock Hits")
+        check("renaming a folder keeps its files and subfolders", burn.items(in: "Rock Hits").count == 1 && burn.items(in: "Rock Hits/Live").count == 1, "\(burn.folderPaths)")
+        let folderUndo = UndoManager()
+        folderUndo.groupsByEvent = false
+        burn.undoManager = folderUndo
+        folderUndo.beginUndoGrouping()
+        burn.move(ids: [two], toFolder: "")
+        folderUndo.endUndoGrouping()
+        folderUndo.undo()
+        check("Undo puts a moved file back in its folder", burn.items(in: "Rock Hits/Live").count == 1)
+        burn.undoManager = nil
+        burn.nudge(id: burn.items(in: "")[0].id, by: -1)
+        burner.set(FixtureBurner.blankDVD())
+        await wait(until: { burn.canBurn })
+        burn.burn()
+        await wait(until: { burn.phase == .done })
+        let layoutJob = burner.jobs.last
+        check("the MP3 Disc job carries each file's folder", layoutJob?.placements == burn.items.map(\.folder) && layoutJob?.folders == ["Rock Hits", "Rock Hits/Live"], "\(layoutJob?.placements ?? []) \(layoutJob?.folders ?? [])")
+        burn.tryAgain()
+        burn.removeFolder("Rock Hits")
+        check("removing a folder keeps its files, one level up", burn.items.count == 3 && burn.items(in: "Live").count == 1 && burn.items(in: "").count == 2, "\(burn.items.map(\.folder))")
+        burn.type = .audio
+        let audioBefore = burner.jobs.count
+        burner.set(FixtureBurner.blankCD())
+        await wait(until: { burn.canBurn })
+        burn.burn()
+        await wait(until: { burn.phase == .done })
+        check("an Audio CD job has no folders", burner.jobs.count == audioBefore + 1 && burner.jobs.last?.placements.isEmpty == true && burner.jobs.last?.folders.isEmpty == true)
+        burn.tryAgain()
+        burn.clear()
+        burn.load(folder: folder)
+        await wait(until: { !burn.isScanning && !burn.items.isEmpty })
+        burn.type = .audio
+
         // S-032: cancel before writing, no cancel after, and a failed burn.
         burner.set(FixtureBurner.blankCD())
         await wait(until: { burn.canBurn })

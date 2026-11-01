@@ -10,7 +10,7 @@ enum AppMode: String, CaseIterable, Identifiable {
     var title: String { self == .rip ? "Rip" : "Burn" }
 }
 
-/// Burn mode: a folder of MP3 files, the disc type, the blank disc, and the burn itself.
+/// Burn mode: MP3 and M4A files (in folders, for an MP3 Disc), the disc type, the blank disc, and the burn itself.
 @Observable
 final class BurnModel: StoppableJob {
     enum Phase: Equatable {
@@ -23,8 +23,10 @@ final class BurnModel: StoppableJob {
     static weak var current: BurnModel?
 
     var items: [BurnItem] = []
+    /// Folders made by hand for an MP3 Disc, empty ones included. Folders that hold files exist without being listed here.
+    private(set) var madeFolders: [String] = []
     private(set) var sourceFolder: URL?
-    /// Files left out of the list: not MP3, or not readable as audio.
+    /// Files left out of the list: not MP3 or M4A, or not readable as audio.
     private(set) var skipped = 0
     private(set) var isScanning = false
     var phase: Phase = .editing
@@ -101,6 +103,20 @@ final class BurnModel: StoppableJob {
         return "Many older CD players cannot read CD-RW discs. A blank CD-R plays in more players."
     }
 
+    /// An MP3 Disc holds MP3 files, so M4A files on it are converted. Said before the burn, not after.
+    var conversionNote: String? {
+        guard type == .data else { return nil }
+        let count = items.filter { !$0.isMP3 }.count
+        guard count > 0 else { return nil }
+        return "\(count) M4A \(count == 1 ? "file is" : "files are") converted to MP3 when the disc is burned."
+    }
+
+    /// Every folder on the disc, in name order.
+    var folderPaths: [String] { DiscLayout.allFolders(items: items, made: madeFolders) }
+
+    /// The list shows folders on an MP3 Disc once there is one.
+    var showsFolders: Bool { type == .data && !folderPaths.isEmpty }
+
     var volumeName: String {
         let name = sourceFolder?.lastPathComponent ?? ""
         return name.isEmpty ? "MP3 Disc" : name
@@ -115,7 +131,7 @@ final class BurnModel: StoppableJob {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.prompt = "Choose"
-        panel.message = "Choose a folder of MP3 files to burn"
+        panel.message = "Choose a folder of MP3 or M4A files to burn"
         if let sourceFolder { panel.directoryURL = sourceFolder } else { panel.directoryURL = URL.musicDirectory }
         if panel.runModal() == .OK, let url = panel.url { load(folder: url) }
     }
@@ -123,6 +139,7 @@ final class BurnModel: StoppableJob {
     func load(folder: URL) {
         isScanning = true
         sourceFolder = folder
+        madeFolders = []
         Task {
             let scan = await BurnScanner.scan(folder)
             items = scan.items
@@ -132,41 +149,128 @@ final class BurnModel: StoppableJob {
         }
     }
 
-    /// Adds dropped files and folders to the list. Files already listed are not added twice.
-    func add(dropped urls: [URL]) async {
+    /// Adds dropped files and folders to the list. Files already listed are not added twice. On an MP3 Disc,
+    /// `folder` is where they land; a dropped folder keeps its own name inside it.
+    func add(dropped urls: [URL], into folder: String = "") async {
         isScanning = true
         let scan = await BurnScanner.scan(dropped: urls)
         let known = Set(items.map(\.id))
-        items += scan.items.filter { !known.contains($0.id) }
+        items += scan.items.filter { !known.contains($0.id) }.map { item in
+            var placed = item
+            placed.folder = DiscLayout.join(folder, item.folder)
+            return placed
+        }
         skipped += scan.skipped
         if sourceFolder == nil, urls.count == 1 { sourceFolder = urls[0].hasDirectoryPath ? urls[0] : urls[0].deletingLastPathComponent() }
         isScanning = false
         phase = .editing
     }
 
+    /// What Undo brings back: the list and its folders.
+    private struct Snapshot { var items: [BurnItem]; var folders: [String] }
+
+    private func registerUndo(_ name: String, from before: Snapshot) {
+        undoManager?.registerUndo(withTarget: self) { model in model.restore(before) }
+        undoManager?.setActionName(name)
+    }
+
+    private var snapshot: Snapshot { Snapshot(items: items, folders: madeFolders) }
+
+    /// Files dropped on a folder: ones already in the list move there, new ones are added there.
+    func drop(_ urls: [URL], into folder: String) async {
+        let known = Dictionary(items.map { ($0.id, $0.id) }, uniquingKeysWith: { first, _ in first })
+        let ids = urls.compactMap { known[$0.resolvingSymlinksInPath().standardizedFileURL.path] }
+        if !ids.isEmpty, type == .data { move(ids: Set(ids), toFolder: folder) }
+        let fresh = urls.filter { known[$0.resolvingSymlinksInPath().standardizedFileURL.path] == nil }
+        if !fresh.isEmpty { await add(dropped: fresh, into: type == .data ? folder : "") }
+    }
+
     func remove(ids: Set<String>) {
         guard !ids.isEmpty else { return }
-        let before = items
+        let before = snapshot
         items.removeAll { ids.contains($0.id) }
-        undoManager?.registerUndo(withTarget: self) { model in model.restore(before) }
-        undoManager?.setActionName(ids.count == 1 ? "Remove File" : "Remove \(ids.count) Files")
+        registerUndo(ids.count == 1 ? "Remove File" : "Remove \(ids.count) Files", from: before)
     }
 
     func move(from source: IndexSet, to destination: Int) {
-        let before = items
+        let before = snapshot
         items.move(fromOffsets: source, toOffset: destination)
-        undoManager?.registerUndo(withTarget: self) { model in model.restore(before) }
-        undoManager?.setActionName("Reorder Files")
+        registerUndo("Reorder Files", from: before)
     }
 
-    private func restore(_ list: [BurnItem]) {
-        let current = items
-        items = list
+    private func restore(_ state: Snapshot) {
+        let current = snapshot
+        items = state.items
+        madeFolders = state.folders
         undoManager?.registerUndo(withTarget: self) { model in model.restore(current) }
+    }
+
+    // MARK: Folders (MP3 Disc)
+
+    /// The files in one folder, in disc order.
+    func items(in folder: String) -> [BurnItem] { items.filter { $0.folder == folder } }
+
+    /// Makes a folder inside `parent` and returns its path. Names are cleaned and kept unique.
+    @discardableResult
+    func makeFolder(named name: String, in parent: String = "") -> String {
+        let before = snapshot
+        let path = DiscLayout.join(parent, DiscLayout.newFolderName(name, in: parent, existing: folderPaths))
+        madeFolders.append(path)
+        registerUndo("New Folder", from: before)
+        return path
+    }
+
+    func renameFolder(_ path: String, to name: String) {
+        let parent = DiscLayout.parent(of: path)
+        let others = folderPaths.filter { $0 != path }
+        let new = DiscLayout.join(parent, DiscLayout.newFolderName(name, in: parent, existing: others))
+        guard new != path else { return }
+        let before = snapshot
+        func renamed(_ value: String) -> String {
+            if value == path { return new }
+            return value.hasPrefix(path + "/") ? new + value.dropFirst(path.count) : value
+        }
+        madeFolders = madeFolders.map(renamed)
+        for index in items.indices { items[index].folder = renamed(items[index].folder) }
+        registerUndo("Rename Folder", from: before)
+    }
+
+    /// Removes a folder from the disc. Its files and folders move up one level; no file is left out.
+    func removeFolder(_ path: String) {
+        let parent = DiscLayout.parent(of: path)
+        let before = snapshot
+        func lifted(_ value: String) -> String {
+            if value == path { return parent }
+            return value.hasPrefix(path + "/") ? DiscLayout.join(parent, String(value.dropFirst(path.count + 1))) : value
+        }
+        madeFolders = madeFolders.filter { $0 != path }.map(lifted)
+        for index in items.indices { items[index].folder = lifted(items[index].folder) }
+        registerUndo("Remove Folder", from: before)
+    }
+
+    /// Puts files in a folder ("" is the top of the disc).
+    func move(ids: Set<String>, toFolder folder: String) {
+        guard items.contains(where: { ids.contains($0.id) && $0.folder != folder }) else { return }
+        let before = snapshot
+        for index in items.indices where ids.contains(items[index].id) { items[index].folder = folder }
+        registerUndo(ids.count == 1 ? "Move File" : "Move \(ids.count) Files", from: before)
+    }
+
+    /// Moves a file up or down among the files of its folder.
+    func nudge(id: String, by offset: Int) {
+        guard let item = items.first(where: { $0.id == id }) else { return }
+        let siblings = items.indices.filter { items[$0].folder == item.folder }
+        guard let position = siblings.firstIndex(where: { items[$0].id == id }) else { return }
+        let target = position + offset
+        guard siblings.indices.contains(target) else { return }
+        let before = snapshot
+        items.swapAt(siblings[position], siblings[target])
+        registerUndo("Reorder Files", from: before)
     }
 
     func clear() {
         items = []
+        madeFolders = []
         sourceFolder = nil
         skipped = 0
         phase = .editing
@@ -181,7 +285,8 @@ final class BurnModel: StoppableJob {
 
     func burn() {
         guard canBurn else { return }
-        let job = BurnJob(type: type, files: items.map(\.url), volumeName: volumeName)
+        let job = BurnJob(type: type, files: items.map(\.url), volumeName: volumeName,
+                          placements: type == .data ? items.map(\.folder) : [], folders: type == .data ? folderPaths : [])
         isCancelling = false
         phase = .burning(.preparing)
         let burner = burner
@@ -246,11 +351,23 @@ final class BurnModel: StoppableJob {
         phase = .editing
         type = .audio
         skipped = 0
+        madeFolders = []
         switch page {
         case .empty:
             items = []
             sourceFolder = nil
             deviceState = FixtureBurner.blankCD()
+        case .folders:
+            type = .data
+            items = list.enumerated().map { index, item in
+                var placed = item
+                placed.folder = index < 2 ? "Slow Pieces" : index < 5 ? "Slow Pieces/Evening" : ""
+                return placed
+            }
+            items[5].url = URL(fileURLWithPath: "/Music/Mix/06 Beat Frequency.m4a")
+            madeFolders = ["Favorites"]
+            sourceFolder = URL(fileURLWithPath: "/Music/Mix", isDirectory: true)
+            deviceState = FixtureBurner.blankDVD()
         case .list:
             items = list
             sourceFolder = URL(fileURLWithPath: "/Music/Mix", isDirectory: true)
@@ -287,5 +404,5 @@ final class BurnModel: StoppableJob {
 }
 
 enum BurnSnapshotPage: String, CaseIterable {
-    case empty, list, noDisc, over, dvd, burning, done, failed
+    case empty, list, folders, noDisc, over, dvd, burning, done, failed
 }

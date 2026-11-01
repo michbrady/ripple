@@ -4,7 +4,7 @@ import Foundation
 public enum DiscType: String, CaseIterable, Identifiable, Sendable {
     /// A standard audio CD: it plays in old CD players, car stereos, and boom boxes. The MP3 files are turned into CD audio.
     case audio
-    /// The MP3 files copied as they are. Holds many hours, but only some players read it.
+    /// MP3 files, in folders if you like. M4A files are converted to MP3. Holds many hours, but only some players read it.
     case data
 
     public var id: String { rawValue }
@@ -12,7 +12,7 @@ public enum DiscType: String, CaseIterable, Identifiable, Sendable {
     public var summary: String {
         switch self {
         case .audio: "Standard audio CD. Plays in old CD players, car stereos, and boom boxes. Holds about 80 minutes."
-        case .data: "Holds many hours. Needs a player that reads MP3 files."
+        case .data: "Holds many hours, with folders if you like. Needs a player that reads MP3 files. M4A files are converted to MP3."
         }
     }
 }
@@ -81,7 +81,7 @@ public struct BurnPlan: Equatable, Sendable {
         case .audio:
             return items.reduce(0) { $0 + Int((($1.seconds * Double(Self.sectorsPerSecond))).rounded(.up)) + Self.gapBlocks }
         case .data:
-            return items.reduce(0) { $0 + ($1.bytes + 2_047) / 2_048 } + Self.dataOverheadBlocks
+            return items.reduce(0) { $0 + ($1.discBytes + 2_047) / 2_048 } + Self.dataOverheadBlocks
         }
     }
 
@@ -134,11 +134,17 @@ public struct BurnJob: Equatable, Sendable {
     /// In disc order.
     public var files: [URL]
     public var volumeName: String
+    /// For an MP3 Disc: the folder each file goes in, one per file ("" is the top of the disc).
+    public var placements: [String]
+    /// For an MP3 Disc: every folder to make, empty ones too.
+    public var folders: [String]
 
-    public init(type: DiscType, files: [URL], volumeName: String) {
+    public init(type: DiscType, files: [URL], volumeName: String, placements: [String] = [], folders: [String] = []) {
         self.type = type
         self.files = files
         self.volumeName = volumeName
+        self.placements = placements
+        self.folders = folders
     }
 }
 

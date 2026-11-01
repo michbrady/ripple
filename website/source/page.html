@@ -183,7 +183,7 @@
       <p class="sub">Two jobs, each with the formats you would expect.</p>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))">
         <div class="card"><h3>Rip a CD</h3><p><b>In:</b> any audio CD.<br><b>Out:</b> MP3 files (variable or fixed quality, up to 320 kbps) or M4A files (AAC), named by song and filled with the album details and cover.</p></div>
-        <div class="card"><h3>Burn a CD</h3><p><b>In:</b> a folder of MP3 files.<br><b>Out:</b> a regular music CD (the standard audio CD format) that plays in any standard CD player, or an MP3 Disc for players that read MP3 files.</p></div>
+        <div class="card"><h3>Burn a CD</h3><p><b>In:</b> a folder of MP3 or M4A files.<br><b>Out:</b> a regular music CD (the standard audio CD format) that plays in any standard CD player, or an MP3 Disc, with folders if you like, for players that read MP3 files.</p></div>
       </div>
     </div>
   </section>
@@ -212,7 +212,7 @@
         <div class="card"><h3>Details inside every file</h3><p>Title, artist, album, year, track and disc numbers, and the cover are written into each file, so other players can show them.</p></div>
         <div class="card"><h3>MP3 or M4A</h3><p>Choose MP3 (variable or fixed quality, up to 320 kbps) or M4A (AAC at 256 kbps). The choice is saved.</p></div>
         <div class="card"><h3>Checks for scratches</h3><p>Ripple reads each part of the disc again to make sure the reads agree. A track it cannot read cleanly is still saved, marked Needs Attention, and you can rip just that track again.</p></div>
-        <div class="card"><h3>Burns a regular music CD</h3><p>Choose a folder of MP3 files and burn a standard Audio CD. It plays in any standard CD player, car stereo, or old boom box. Or burn an MP3 Disc, which holds many hours for players that read MP3 files.</p></div>
+        <div class="card"><h3>Burns a regular music CD</h3><p>Choose a folder of MP3 or M4A files and burn a standard Audio CD. It plays in any standard CD player, car stereo, or old boom box. Or burn an MP3 Disc, which holds many hours for players that read MP3 files. M4A files are converted to MP3 for you.</p></div>
         <div class="card"><h3>Private</h3><p>No account and no tracking. The only thing Ripple sends over the internet is the album and cover lookup, and ripping works without it. <a href="privacy.html">Privacy and terms</a></p></div>
       </div>
     </div>
@@ -239,8 +239,8 @@
       </picture>
       <div>
         <h2>Burn a music CD that plays in any CD player.</h2>
-        <p class="sub" style="margin-bottom:1rem">Choose a folder of MP3 files, drag them into the order you want, and watch the capacity bar. Ripple turns them into a regular <b>Audio CD</b>, the standard format, so it plays in standard CD players, car stereos, and old boom boxes. Use a blank <b>CD-R</b>: many older players cannot read CD-RW discs. If the files do not fit, Ripple says how much to remove.</p>
-        <p class="sub" style="margin-bottom:0">Prefer to keep the files as they are? Burn an <b>MP3 Disc</b> instead. It holds many hours, for players that read MP3 files.</p>
+        <p class="sub" style="margin-bottom:1rem">Choose a folder of MP3 or M4A files, drag them into the order you want, and watch the capacity bar. Ripple turns them into a regular <b>Audio CD</b>, the standard format, so it plays in standard CD players, car stereos, and old boom boxes. Use a blank <b>CD-R</b>: many older players cannot read CD-RW discs. If the files do not fit, Ripple says how much to remove.</p>
+        <p class="sub" style="margin-bottom:0">Prefer MP3 files on the disc? Burn an <b>MP3 Disc</b> instead. It holds many hours, for players that read MP3 files. Make folders on the disc, drop your files into them, and M4A files are converted to MP3 as it burns.</p>
       </div>
     </div>
   </section>
@@ -281,7 +281,7 @@
       <p class="sub">Ripple is new. Here is what has been tried, and what has not.</p>
       <ul class="list">
         <li><b>Ripping</b> has been tried on real music CDs with one USB drive, including a disc with a data session. The audio matched the Mac&rsquo;s own copy exactly.</li>
-        <li><b>Burning takes MP3 files.</b> Other kinds of audio files, such as M4A, are not accepted for burning yet.</li>
+        <li><b>Burning takes MP3 and M4A files.</b> Other kinds of audio files are not accepted for burning yet. On an MP3 Disc, M4A files are converted to MP3 (192 kbps), so they lose a little quality.</li>
         <li><b>Burning an MP3 Disc</b> has been tried on a real disc and checked file by file. <b>Burning an Audio CD</b> has not been tried on a real CD-R yet.</li>
         <li><b>Check for errors</b> catches reads that fail or disagree. It cannot catch a drive that repeats the same wrong data twice. Stronger checking is planned.</li>
         {{NOTARY_BULLET}}

@@ -4,9 +4,9 @@ import Foundation
 /// written into every name: `01 - Title.mp3`.
 public enum BurnNaming {
     /// `position` is 1-based. A number the file already starts with ("07 - ", "7. ", "07_") is replaced,
-    /// not doubled. A title that merely begins with a number ("99 Luftballons", "1979") is kept whole.
-    public static func discFileName(position: Int, of total: Int = 0, original: URL, maxStemBytes: Int = 48) -> String {
-        let ext = original.pathExtension
+    /// not doubled. `fileExtension` replaces the original one (an M4A burned as MP3). A title that merely begins with a number ("99 Luftballons", "1979") is kept whole.
+    public static func discFileName(position: Int, of total: Int = 0, original: URL, maxStemBytes: Int = 48, fileExtension: String? = nil) -> String {
+        let ext = fileExtension ?? original.pathExtension
         let fullStem = original.deletingPathExtension().lastPathComponent
         let stripped = stripLeadingNumber(fullStem)
         let stem = FileNamer.clean(stripped.isEmpty ? fullStem : stripped, maxBytes: maxStemBytes)
