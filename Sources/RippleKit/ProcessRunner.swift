@@ -52,15 +52,27 @@ public enum ProcessRunner {
 
     /// Runs a program and waits. Cancelling the surrounding task stops the program.
     /// `onLine` receives each line of standard output as it arrives.
-    public static func run(_ executable: URL, _ arguments: [String], onLine: (@Sendable (String) -> Void)? = nil) async throws -> ProcessResult {
+    /// `input` is a file the program reads as its standard input, and `outputFile` a file that receives its standard output
+    /// (spumux works that way). `environment` adds to the program's environment.
+    public static func run(_ executable: URL, _ arguments: [String], input: URL? = nil, outputFile: URL? = nil,
+                           environment: [String: String] = [:], onLine: (@Sendable (String) -> Void)? = nil) async throws -> ProcessResult {
         try Task.checkCancellation()
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
+        if !environment.isEmpty { process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new } }
         let out = Pipe(), err = Pipe()
-        process.standardOutput = out
+        var sink: FileHandle?
+        if let outputFile {
+            FileManager.default.createFile(atPath: outputFile.path, contents: nil)
+            sink = try FileHandle(forWritingTo: outputFile)
+            process.standardOutput = sink
+        } else {
+            process.standardOutput = out
+        }
+        defer { try? sink?.close() }
         process.standardError = err
-        process.standardInput = FileHandle.nullDevice
+        process.standardInput = try input.map { try FileHandle(forReadingFrom: $0) } ?? FileHandle.nullDevice
         let outBuffer = LineBuffer(), errBuffer = LineBuffer()
         out.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData

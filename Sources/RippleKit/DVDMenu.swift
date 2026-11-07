@@ -92,19 +92,68 @@ public enum DVDMenuLayout {
     }
 }
 
-public enum DVDMenuRenderer {
-    /// The two overlay colors. Each overlay is transparent plus one of these, so it stays within four colors.
-    static let highlightColor: (r: UInt8, g: UInt8, b: UInt8) = (255, 214, 10)
-    static let selectColor: (r: UInt8, g: UInt8, b: UInt8) = (255, 255, 255)
+/// One of the four built-in looks for a menu.
+public enum MenuLook: String, CaseIterable, Identifiable, Sendable {
+    case classic, midnight, daylight, warm
 
-    public static func render(discName: String, titles: [DVDMenuTitle], standard: TVStandard) -> [DVDMenuPage] {
+    public var id: String { rawValue }
+    public var title: String { rawValue.capitalized }
+
+    public typealias RGB = (r: Double, g: Double, b: Double)
+    /// Top and bottom of the background gradient.
+    var gradient: (top: RGB, bottom: RGB) {
+        switch self {
+        case .classic: ((0.07, 0.30, 0.38), (0.02, 0.12, 0.17))
+        case .midnight: ((0.05, 0.06, 0.16), (0.0, 0.0, 0.03))
+        case .daylight: ((0.96, 0.97, 0.99), (0.84, 0.88, 0.93))
+        case .warm: ((0.30, 0.12, 0.05), (0.12, 0.04, 0.02))
+        }
+    }
+    var text: RGB { self == .daylight ? (0.07, 0.07, 0.09) : (1, 1, 1) }
+    /// A picture behind the menu is covered by this layer so the text stays readable: black for dark looks, white for light.
+    var coverIsLight: Bool { self == .daylight }
+    /// The frame around the chosen button, and the frame while it is pressed. They must stand out against the background.
+    var highlight: (r: UInt8, g: UInt8, b: UInt8) { self == .daylight ? (200, 30, 30) : (255, 214, 10) }
+    var select: (r: UInt8, g: UInt8, b: UInt8) { self == .daylight ? (0, 90, 200) : (255, 255, 255) }
+    static let coverOpacity = 0.7
+
+    /// WCAG contrast ratio between two colors, 1 to 21.
+    public static func contrast(_ a: RGB, _ b: RGB) -> Double {
+        func luminance(_ c: RGB) -> Double {
+            func channel(_ v: Double) -> Double { v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+            return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b)
+        }
+        let (l1, l2) = (luminance(a), luminance(b))
+        return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+    }
+
+    /// The worst contrast between this look's text and a background picture of any color, once the cover layer is on.
+    public var worstTextContrastOverPicture: Double {
+        let blend: (RGB) -> RGB = { c in
+            let cover: Double = self.coverIsLight ? 1 : 0
+            let a = Self.coverOpacity
+            return (c.r * (1 - a) + cover * a, c.g * (1 - a) + cover * a, c.b * (1 - a) + cover * a)
+        }
+        // The hardest pictures are pure white and pure black.
+        return [(1.0, 1.0, 1.0), (0.0, 0.0, 0.0)].map { Self.contrast(text, blend(($0.0, $0.1, $0.2))) }.min()!
+    }
+
+    /// The worst contrast between the text and the plain gradient.
+    public var textContrast: Double {
+        min(Self.contrast(text, gradient.top), Self.contrast(text, gradient.bottom))
+    }
+}
+
+public enum DVDMenuRenderer {
+    /// `background` is the user's own picture; it is cropped to fill the menu and covered so the text stays readable.
+    public static func render(discName: String, titles: [DVDMenuTitle], standard: TVStandard, look: MenuLook = .classic, background: CGImage? = nil) -> [DVDMenuPage] {
         let pages = DVDMenuLayout.pages(titleCount: titles.count)
         return pages.enumerated().map { index, range in
             let buttons = DVDMenuLayout.buttons(titles: range, page: index, pageCount: pages.count, standard: standard)
             return DVDMenuPage(
-                picture: png(picture(discName: discName, titles: titles, buttons: buttons, page: index, pages: pages.count, standard: standard)),
-                highlight: png(overlay(buttons: buttons, color: highlightColor, grow: 4, standard: standard)),
-                select: png(overlay(buttons: buttons, color: selectColor, grow: 4, standard: standard)),
+                picture: png(picture(discName: discName, titles: titles, buttons: buttons, page: index, pages: pages.count, standard: standard, look: look, background: background)),
+                highlight: png(overlay(buttons: buttons, color: look.highlight, grow: 4, standard: standard)),
+                select: png(overlay(buttons: buttons, color: look.select, grow: 4, standard: standard)),
                 buttons: buttons)
         }
     }
@@ -119,15 +168,27 @@ public enum DVDMenuRenderer {
         return ctx
     }
 
-    static func picture(discName: String, titles: [DVDMenuTitle], buttons: [DVDMenuButton], page: Int, pages: Int, standard: TVStandard) -> CGImage {
+    static func picture(discName: String, titles: [DVDMenuTitle], buttons: [DVDMenuButton], page: Int, pages: Int, standard: TVStandard, look: MenuLook, background: CGImage?) -> CGImage {
         let ctx = context(standard)
         let w = CGFloat(standard.width), h = CGFloat(standard.height)
+        let g = look.gradient
         let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: [
-            CGColor(red: 0.07, green: 0.30, blue: 0.38, alpha: 1), CGColor(red: 0.02, green: 0.12, blue: 0.17, alpha: 1)] as CFArray, locations: [0, 1])!
+            CGColor(red: g.top.r, green: g.top.g, blue: g.top.b, alpha: 1), CGColor(red: g.bottom.r, green: g.bottom.g, blue: g.bottom.b, alpha: 1)] as CFArray, locations: [0, 1])!
         ctx.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: 0, y: h), options: [])
-        text(ctx, discName, size: 30, bold: true, in: CGRect(x: 48, y: 44 * h / 480, width: w - 96, height: 44), align: .center, standard: standard)
+        if let background {
+            // Crop to fill, then cover: a picture of any color keeps the text readable (see `MenuLook.worstTextContrastOverPicture`).
+            let scale = max(w / CGFloat(background.width), h / CGFloat(background.height))
+            let size = CGSize(width: CGFloat(background.width) * scale, height: CGFloat(background.height) * scale)
+            ctx.saveGState(); ctx.interpolationQuality = .high
+            ctx.translateBy(x: (w - size.width) / 2, y: (h + size.height) / 2); ctx.scaleBy(x: 1, y: -1)
+            ctx.draw(background, in: CGRect(origin: .zero, size: size))
+            ctx.restoreGState()
+            let cover: CGFloat = look.coverIsLight ? 1 : 0
+            ctx.setFillColor(CGColor(red: cover, green: cover, blue: cover, alpha: MenuLook.coverOpacity)); ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        }
+        text(ctx, discName, size: 30, bold: true, in: CGRect(x: 48, y: 44 * h / 480, width: w - 96, height: 44), align: .center, standard: standard, color: look.text)
         if pages > 1 {
-            text(ctx, "Page \(page + 1) of \(pages)", size: 14, bold: false, in: CGRect(x: 48, y: 84 * h / 480, width: w - 96, height: 20), align: .center, standard: standard)
+            text(ctx, "Page \(page + 1) of \(pages)", size: 14, bold: false, in: CGRect(x: 48, y: 84 * h / 480, width: w - 96, height: 20), align: .center, standard: standard, color: look.text)
         }
         for button in buttons {
             let rect = CGRect(x: button.x0, y: button.y0, width: button.x1 - button.x0 + 1, height: button.y1 - button.y0 + 1)
@@ -137,19 +198,20 @@ public enum DVDMenuRenderer {
                 let thumb = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.width * 9 / 16)
                 ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1)); ctx.fill(thumb)
                 if let image = title.thumbnail { draw(image, fitting: thumb, in: ctx) }
-                text(ctx, title.name, size: 12, bold: false, in: CGRect(x: rect.minX, y: thumb.maxY + 4, width: rect.width, height: rect.maxY - thumb.maxY - 4), align: .center, standard: standard, lines: 2)
-            case .playAll: label(ctx, "Play All", rect, standard)
-            case .previous: label(ctx, "Previous", rect, standard)
-            case .next: label(ctx, "Next", rect, standard)
+                text(ctx, title.name, size: 12, bold: false, in: CGRect(x: rect.minX, y: thumb.maxY + 4, width: rect.width, height: rect.maxY - thumb.maxY - 4), align: .center, standard: standard, lines: 2, color: look.text)
+            case .playAll: label(ctx, "Play All", rect, standard, look)
+            case .previous: label(ctx, "Previous", rect, standard, look)
+            case .next: label(ctx, "Next", rect, standard, look)
             }
         }
         return ctx.makeImage()!
     }
 
-    static func label(_ ctx: CGContext, _ string: String, _ rect: CGRect, _ standard: TVStandard) {
-        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.16))
+    static func label(_ ctx: CGContext, _ string: String, _ rect: CGRect, _ standard: TVStandard, _ look: MenuLook) {
+        let tone: CGFloat = look.coverIsLight ? 0 : 1
+        ctx.setFillColor(CGColor(red: tone, green: tone, blue: tone, alpha: 0.16))
         ctx.addPath(CGPath(roundedRect: rect, cornerWidth: 8, cornerHeight: 8, transform: nil)); ctx.fillPath()
-        text(ctx, string, size: 18, bold: true, in: rect.insetBy(dx: 0, dy: 9 * CGFloat(standard.height) / 480), align: .center, standard: standard)
+        text(ctx, string, size: 18, bold: true, in: rect.insetBy(dx: 0, dy: 9 * CGFloat(standard.height) / 480), align: .center, standard: standard, color: look.text)
     }
 
     static func draw(_ image: CGImage, fitting box: CGRect, in ctx: CGContext) {
@@ -165,12 +227,12 @@ public enum DVDMenuRenderer {
 
     enum Align { case center }
 
-    static func text(_ ctx: CGContext, _ string: String, size: CGFloat, bold: Bool, in rect: CGRect, align: Align, standard: TVStandard, lines: Int = 1) {
+    static func text(_ ctx: CGContext, _ string: String, size: CGFloat, bold: Bool, in rect: CGRect, align: Align, standard: TVStandard, lines: Int = 1, color: MenuLook.RGB = (1, 1, 1)) {
         let font = CTFontCreateWithName((bold ? "HelveticaNeue-Bold" : "HelveticaNeue") as CFString, size, nil)
         let paragraph = NSMutableParagraphStyleBox.centered(wrapping: lines > 1)
         let attributes: [NSAttributedString.Key: Any] = [
             NSAttributedString.Key(kCTFontAttributeName as String): font,
-            NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(red: 1, green: 1, blue: 1, alpha: 1),
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(red: color.r, green: color.g, blue: color.b, alpha: 1),
             NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraph,
         ]
         let framesetter = CTFramesetterCreateWithAttributedString(NSAttributedString(string: string, attributes: attributes))
