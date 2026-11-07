@@ -55,11 +55,12 @@ public enum ProcessRunner {
     /// `input` is a file the program reads as its standard input, and `outputFile` a file that receives its standard output
     /// (spumux works that way). `environment` adds to the program's environment.
     public static func run(_ executable: URL, _ arguments: [String], input: URL? = nil, outputFile: URL? = nil,
-                           environment: [String: String] = [:], onLine: (@Sendable (String) -> Void)? = nil) async throws -> ProcessResult {
+                           environment: [String: String] = [:], directory: URL? = nil, onLine: (@Sendable (String) -> Void)? = nil) async throws -> ProcessResult {
         try Task.checkCancellation()
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
+        if let directory { process.currentDirectoryURL = directory }
         if !environment.isEmpty { process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new } }
         let out = Pipe(), err = Pipe()
         var sink: FileHandle?
@@ -74,9 +75,12 @@ public enum ProcessRunner {
         process.standardError = err
         process.standardInput = try input.map { try FileHandle(forReadingFrom: $0) } ?? FileHandle.nullDevice
         let outBuffer = LineBuffer(), errBuffer = LineBuffer()
-        out.fileHandleForReading.readabilityHandler = { handle in
-            let data = handle.availableData
-            if !data.isEmpty { outBuffer.add(data) { onLine?($0) } }
+        // With the output going to a file, the pipe is never used, and waiting for its end would wait forever.
+        if outputFile == nil {
+            out.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if !data.isEmpty { outBuffer.add(data) { onLine?($0) } }
+            }
         }
         err.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
@@ -99,7 +103,7 @@ public enum ProcessRunner {
         out.fileHandleForReading.readabilityHandler = nil
         err.fileHandleForReading.readabilityHandler = nil
         // Bytes that arrived between the last handler call and the exit.
-        if let rest = try? out.fileHandleForReading.readToEnd(), !rest.isEmpty { outBuffer.add(rest) { onLine?($0) } }
+        if outputFile == nil, let rest = try? out.fileHandleForReading.readToEnd(), !rest.isEmpty { outBuffer.add(rest) { onLine?($0) } }
         if let rest = try? err.fileHandleForReading.readToEnd(), !rest.isEmpty { errBuffer.add(rest) { _ in } }
         try Task.checkCancellation()
         return ProcessResult(status: status, output: outBuffer.text, error: errBuffer.text)

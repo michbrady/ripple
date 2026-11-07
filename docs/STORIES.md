@@ -470,7 +470,8 @@ Acceptance:
 - [unit] ffmpeg's report of a file becomes length, size, frame rate, picture size, and whether it has audio.
 - [self] A file that cannot be read says so on its row. A copy-protected file says "This video is copy-protected, so Ripple cannot read it."
 - [snap] 11-dvd-list shows rows with a picture from the video, a title, the length, and a state.
-Status: todo
+Status: doing
+Note: The reader (length, size, rate, shape, sound, copy-protection) is built and tested on real .mov, .mp4, .avi, .mkv, .wmv, and .mpg files. The window is not built yet.
 
 ### S-041 Order, name, and remove titles
 As the user, I put the videos in order, change each title's name, and remove ones I do not want.
@@ -479,7 +480,8 @@ Depends: S-040
 Acceptance:
 - [unit] A title's name starts as the file's name without its ending and underscores, and is made safe for the menu (length cut, no line breaks).
 - [self] Move Up, Move Down, drag to reorder, rename, remove, and Undo all work.
-Status: todo
+Status: doing
+Note: Names are cleaned and cut (tested). The list and its controls are not built yet.
 
 ### S-042 See if it fits, and how good it will look
 As the user, I see a bar for the disc and a word for the picture quality, and I am told when there is too much.
@@ -489,7 +491,8 @@ Acceptance:
 - [unit] The plan gives each title the same bit rate from what is left after audio and menus, capped at 9,000 kbit/s; the bands are Excellent, Good, Reduced, and Too long.
 - [unit] A dual-layer disc in the drive raises the capacity.
 - [snap] The bar shows used space and the quality word. Too long shows what to remove, in minutes.
-Status: todo
+Status: doing
+Note: The plan (bit rate, quality bands, fit, dual layer) is built and tested. The bar in the window is not built yet.
 
 ### S-043 TV standard and screen shape
 As the user, the disc is made for my TV: NTSC by default, PAL when my videos are PAL, widescreen or standard per video.
@@ -499,7 +502,8 @@ Acceptance:
 - [unit] 25 and 50 frames a second suggest PAL; 23.976, 24, 29.97, and 30 suggest NTSC. Mixed videos use the first one and say so.
 - [unit] A 16:9 source stays 16:9; a 4:3 source gets bars at the sides; other shapes get bars on the sides or the top to fit without stretching.
 - [self] A choice in the window overrides the suggestion.
-Status: todo
+Status: doing
+Note: NTSC or PAL from the frame rate, and the 4:3 or 16:9 fit with bars, are built and tested, and a real ffmpeg conversion was read back. The choices in the window are not built yet.
 
 ### S-044 Make the menu
 As the user, Ripple draws a menu for the disc: its name, a button for each title with a picture, and Play All.
@@ -511,7 +515,7 @@ Acceptance:
 - [snap] 11-dvd-menu shows the first menu page as the disc will show it.
 - [manual] A DVD player shows the menu, moves between buttons with the arrow keys, and plays the chosen title.
 Status: doing
-Note: the layout, drawing, and overlay rules are built and tested (DVDMenuTests). The player check is not yet possible here.
+Note: Layout, drawing, button links, and the four-color overlay rules are built and tested (DVDMenuTests). A real spumux run and a player check wait for dvdauthor.
 
 ### S-049 Choose a menu look
 As the user, I pick one of four looks for the menu: Classic, Midnight, Daylight, or Warm.
@@ -520,7 +524,8 @@ Depends: S-044
 Acceptance:
 - [unit] Each look has a background, a text color, and a highlight color; the text keeps a contrast of at least 7 to 1 against its background.
 - [snap] 11-dvd-menu shows each look.
-Status: todo
+Status: doing
+Note: The four looks are built, and each keeps text at 7 to 1 or better (tested).
 
 ### S-050 Use my own picture and music on the menu
 As the user, I choose a picture for the menu's background and a sound file to play under it.
@@ -530,7 +535,8 @@ Acceptance:
 - [unit] A picture is cropped to fill the menu and darkened so white text keeps a contrast of at least 7 to 1.
 - [unit] The music is cut to 90 seconds at most; a shorter file is used whole; the menu's length matches it.
 - [self] A picture or sound file that cannot be read is named and the built-in background and silence are used instead.
-Status: todo
+Status: doing
+Note: Background picture (cropped and covered, 7 to 1 worst case, tested) and music (length 5 to 90 seconds, tested with a stand-in) are in the pipeline. The choosers in the window are not built yet.
 
 ### S-051 Scene menus
 As the user, a title with chapters has a page of chapter pictures, and each picture plays from that chapter.
@@ -562,7 +568,8 @@ Acceptance:
 - [self] With stand-in tools, every step runs in order, reports progress, and Cancel stops the running program and removes the work folder.
 - [self] Not enough free space for the work folder is said before anything starts.
 - [self] A short real test video makes a VIDEO_TS folder that dvdauthor's own reader reads back with the right number of titles and chapters.
-Status: todo
+Status: doing
+Note: The whole pipeline runs against stand-in tools in the right order, with progress, a named failure, cancel with clean-up, and the real disc image mounted and read back (DVDBuilderTests). dvdauthor itself is not built yet, so a real disc has not been made.
 
 ### S-046 Make a disc image
 As the user, I can stop before burning and save the disc as an image (.iso) that opens in a DVD player app.
@@ -571,7 +578,8 @@ Depends: S-045
 Acceptance:
 - [self] The image mounts with VIDEO_TS and AUDIO_TS in it, and the volume name is the disc's name.
 - [self] Save Disc Image needs no drive and no blank disc.
-Status: todo
+Status: doing
+Note: The image step runs for real (hdiutil, UDF 1.02) inside the pipeline test. Saving it from the window is not built yet.
 
 ### S-047 Burn the Video DVD
 As the user, I put in a blank DVD-R or DVD-RW and burn the disc.
