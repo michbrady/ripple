@@ -16,12 +16,14 @@ struct RippleApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var model = AppModel()
     @State private var burn = BurnModel(burner: Burners.make())
+    @State private var dvd = DVDModel()
 
     var body: some Scene {
         Window("Ripple", id: "main") {
             ContentView()
                 .environment(model)
                 .environment(burn)
+                .environment(dvd)
                 .themed()
                 .overlay { if GridOverlay.enabled { GridOverlay() } }
                 .frame(minWidth: 640, minHeight: 420)

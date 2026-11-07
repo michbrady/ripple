@@ -97,6 +97,7 @@ enum SelfTest {
             await tagChecks(model: model, out: out)
             await attentionChecks(model: model, out: out)
             await burnChecks(burn: burn, out: out)
+            await dvdChecks(burn: burn)
             await polishChecks(model: model, out: out)
             await installerChecks(out: out)
             realDriveChecks()

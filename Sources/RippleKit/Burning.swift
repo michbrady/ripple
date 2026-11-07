@@ -6,13 +6,22 @@ public enum DiscType: String, CaseIterable, Identifiable, Sendable {
     case audio
     /// MP3 files, in folders if you like. M4A files are converted to MP3. Holds many hours, but only some players read it.
     case data
+    /// A Video DVD: videos with a menu, made by `DVDBuilder`. It plays in any DVD player.
+    case video
 
     public var id: String { rawValue }
-    public var title: String { self == .audio ? "Audio CD" : "MP3 Disc" }
+    public var title: String {
+        switch self {
+        case .audio: "Audio CD"
+        case .data: "MP3 Disc"
+        case .video: "Video DVD"
+        }
+    }
     public var summary: String {
         switch self {
         case .audio: "Standard audio CD. Plays in old CD players, car stereos, and boom boxes. Holds about 80 minutes."
         case .data: "Holds many hours, with folders if you like. Needs a player that reads MP3 files. M4A files are converted to MP3."
+        case .video: "Plays in any DVD player, with a menu. Holds about 2 hours of video."
         }
     }
 }
@@ -82,6 +91,8 @@ public struct BurnPlan: Equatable, Sendable {
             return items.reduce(0) { $0 + Int((($1.seconds * Double(Self.sectorsPerSecond))).rounded(.up)) + Self.gapBlocks }
         case .data:
             return items.reduce(0) { $0 + ($1.discBytes + 2_047) / 2_048 } + Self.dataOverheadBlocks
+        case .video:
+            return 0   // a Video DVD is planned by DVDPlan, not by music files
         }
     }
 
@@ -111,7 +122,7 @@ public struct BurnPlan: Equatable, Sendable {
         case .audio:
             let minutes = Int((Double(blocks) / Double(Self.sectorsPerSecond) / 60).rounded(.up))
             return "\(minutes) min over"
-        case .data:
+        case .data, .video:
             let megabytes = Int((Double(blocks) * 2_048 / 1_048_576).rounded(.up))
             return "\(megabytes) MB over"
         }
@@ -123,7 +134,7 @@ public struct BurnPlan: Equatable, Sendable {
         switch type {
         case .audio:
             return "\(Int((Double(blocksNeeded) / Double(Self.sectorsPerSecond) / 60).rounded(.up))) min of \(capacity / Self.sectorsPerSecond / 60) min"
-        case .data:
+        case .data, .video:
             return "\(Int((Double(blocksNeeded) * 2_048 / 1_048_576).rounded(.up))) MB of \(capacity * 2_048 / 1_048_576) MB"
         }
     }

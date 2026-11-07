@@ -433,3 +433,12 @@ import Testing
         #expect(BurnNaming.discFileName(position: 1, original: URL(fileURLWithPath: "/m/Song.m4a"), fileExtension: "mp3") == "01 - Song.mp3")
     }
 }
+
+@Suite struct DiscTypeTests {
+    @Test func videoDVDIsTheThirdDiscType() {
+        #expect(DiscType.allCases == [.audio, .data, .video])
+        #expect(DiscType.video.title == "Video DVD")
+        #expect(!DiscType.video.summary.isEmpty)
+        #expect(DiscType(rawValue: "video") == .video)
+    }
+}

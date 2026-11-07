@@ -114,6 +114,8 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
                 (folders[entry.folder] ?? root).addChild(item)
             }
             layout = DRTrack(forRootFolder: root) as Any
+        case .video:
+            throw BurnError.driveError("Burning a Video DVD is not ready yet.")   // S-047
         }
         guard let burn = DRBurn(device: device) else { throw BurnError.noDisc }
         burn.setProperties([

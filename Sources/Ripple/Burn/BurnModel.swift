@@ -70,8 +70,8 @@ final class BurnModel: StoppableJob {
     var deviceName: String { burner.deviceName ?? "Burner" }
 
     var isReady: Bool {
-        if case .ready = deviceState { return true }
-        return false
+        guard case .ready(let media) = deviceState else { return false }
+        return type != .video || media.kind == .dvd
     }
 
     var canBurn: Bool { phase == .editing && isReady && fit == .fits }
@@ -80,11 +80,17 @@ final class BurnModel: StoppableJob {
     var deviceLine: String {
         switch deviceState {
         case .noDrive: "Connect a USB burner to burn a disc."
-        case .noDisc: type == .audio ? "Insert a blank CD-R." : "Insert a blank CD-R or DVD-R."
+        case .noDisc:
+            switch type {
+            case .audio: "Insert a blank CD-R."
+            case .data: "Insert a blank CD-R or DVD-R."
+            case .video: "Insert a blank DVD-R or DVD-RW."
+            }
         case .notBlank(let label, let rewritable):
             rewritable ? "This \(label) is not blank. Erase it in Disk Utility, then insert it again."
                        : "This \(label) is not blank. Insert a blank disc."
-        case .ready(let media): "\(deviceName) · blank \(media.label)"
+        case .ready(let media):
+            isReady ? "\(deviceName) · blank \(media.label)" : "Insert a blank DVD-R or DVD-RW. This disc is a \(media.label)."
         }
     }
 
@@ -380,6 +386,11 @@ final class BurnModel: StoppableJob {
             items = list + (7...20).map { file($0, "Long Piece \($0)", "The Tones", 330) }
             sourceFolder = URL(fileURLWithPath: "/Music/Mix", isDirectory: true)
             deviceState = FixtureBurner.blankCD()
+        case .videoEmpty:
+            type = .video
+            items = []
+            sourceFolder = nil
+            deviceState = FixtureBurner.blankDVD()
         case .dvd:
             items = list
             sourceFolder = URL(fileURLWithPath: "/Music/Mix", isDirectory: true)
@@ -404,5 +415,5 @@ final class BurnModel: StoppableJob {
 }
 
 enum BurnSnapshotPage: String, CaseIterable {
-    case empty, list, folders, noDisc, over, dvd, burning, done, failed
+    case empty, list, folders, noDisc, over, dvd, burning, done, failed, videoEmpty
 }

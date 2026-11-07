@@ -465,7 +465,8 @@ UX:
 - States: empty "Add Videos for the Disc" / "Drop video files here, or choose them." / button "Choose Videos…"; no blank DVD says "Insert a blank DVD-R or DVD-RW." in the bar, never a CD
 - Words: switch label "Video DVD"; summary "Plays in any DVD player, with a menu. Holds about 2 hours of video."
 - Access: the switch is reachable by keyboard like the other two; the empty page's default button has focus; VoiceOver reads "Video DVD, disc type"
-Status: todo
+Status: done
+Note: Snapshot page is `burn-videoEmpty` (Burn mode, Video DVD chosen). The Disc Type switch now shows on the empty Burn page too, so the three choices are always reachable. "Choose Videos…" stays disabled until S-040.
 
 ### S-040 Add video files
 As the user, I add video files by dropping them, or by choosing files, and see each with its length and size.

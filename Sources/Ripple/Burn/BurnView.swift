@@ -9,7 +9,11 @@ struct BurnView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            content
+            if burn.type == .video, burn.phase == .editing {
+                DVDView()
+            } else {
+                content
+            }
             if showsBar {
                 Divider()
                 BurnBar()
@@ -28,7 +32,7 @@ struct BurnView: View {
 
     private var showsBar: Bool {
         switch burn.phase {
-        case .editing: !burn.items.isEmpty
+        case .editing: !burn.items.isEmpty && burn.type != .video
         case .burning, .done, .failed: false
         }
     }
@@ -65,14 +69,19 @@ struct BurnEmpty: View {
     @Environment(BurnModel.self) private var burn
 
     var body: some View {
-        ContentUnavailableView {
-            Label("Choose Music Files to Burn", systemImage: "opticaldisc")
-        } description: {
-            Text(burn.isScanning ? "Reading files…" : "Choose a folder of MP3 or M4A files, or drop files and folders here.")
-        } actions: {
-            Button("Choose Folder…") { burn.chooseFolder() }
-                .keyboardShortcut(.defaultAction)
-                .disabled(burn.isScanning)
+        VStack(spacing: 0) {
+            DiscTypeHeader()
+            Divider()
+            ContentUnavailableView {
+                Label("Choose Music Files to Burn", systemImage: "opticaldisc")
+            } description: {
+                Text(burn.isScanning ? "Reading files…" : "Choose a folder of MP3 or M4A files, or drop files and folders here.")
+            } actions: {
+                Button("Choose Folder…") { burn.chooseFolder() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(burn.isScanning)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
