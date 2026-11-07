@@ -8,5 +8,6 @@ enum AppLinks {
     static let tip = URL(string: "https://ko-fi.com/bradysbit")!
     /// The programs that make a Video DVD, credited in the About window.
     static let ffmpeg = URL(string: "https://ffmpeg.org/")!
+    static let tsMuxeR = URL(string: "https://github.com/justdan96/tsMuxer")!
     static let dvdauthor = URL(string: "https://dvdauthor.sourceforge.net/")!
 }

@@ -38,6 +38,7 @@ struct DVDView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onChange(of: burn.type, initial: true) { _, type in if let format = type.videoFormat { dvd.format = format } }
     }
 }
 

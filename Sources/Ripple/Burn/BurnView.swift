@@ -10,7 +10,7 @@ struct BurnView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if burn.type == .video, burn.phase == .editing {
+            if burn.type.isVideo, burn.phase == .editing {
                 DVDView()
             } else {
                 content
@@ -27,7 +27,7 @@ struct BurnView: View {
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard burn.phase == .editing else { return false }
-            if burn.type == .video {
+            if burn.type.isVideo {
                 Task { await dvd.add(urls) }
                 return true
             }
@@ -38,7 +38,7 @@ struct BurnView: View {
 
     private var showsBar: Bool {
         switch burn.phase {
-        case .editing: !burn.items.isEmpty && burn.type != .video
+        case .editing: !burn.items.isEmpty && !burn.type.isVideo
         case .burning, .done, .failed: false
         }
     }

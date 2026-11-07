@@ -40,7 +40,7 @@ struct DVDList: View {
                             .font(.callout).foregroundStyle(.secondary)
                     }
                     if dvd.tooMany {
-                        Label("A DVD holds 99 videos at most.", systemImage: "exclamationmark.triangle.fill")
+                        Label("A \(dvd.format.title) holds 99 videos at most.", systemImage: "exclamationmark.triangle.fill")
                             .font(.callout).foregroundStyle(Surface.warning)
                     }
                 }

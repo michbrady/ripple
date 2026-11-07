@@ -10,7 +10,7 @@ struct DVDBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
             if !dvd.videos.isEmpty { fit }
-            if !dvd.videos.isEmpty { choices }
+            if !dvd.videos.isEmpty { dvd.format == .dvd ? AnyView(choices) : AnyView(pictureNote) }
             HStack(spacing: Space.md) {
                 Image(systemName: burn.isReady ? "checkmark.circle.fill" : "exclamationmark.circle")
                     .foregroundStyle(burn.isReady ? Color.secondary : Surface.warning)
@@ -50,6 +50,12 @@ struct DVDBar: View {
         }
     }
 
+    /// A Blu-ray is made in one HD shape, chosen from the first video; there is nothing to pick.
+    private var pictureNote: some View {
+        Label("The disc is made in \(dvd.bluRayMode.title) high definition, from the first video. It plays at once, with no menu.", systemImage: "info.circle")
+            .font(.callout).foregroundStyle(.secondary)
+    }
+
     private var fit: some View {
         let plan = dvd.plan(on: burn.deviceState)
         let tooLong: Bool = { if case .tooLong = plan.fit { true } else { false } }()
@@ -61,7 +67,7 @@ struct DVDBar: View {
             HStack(spacing: Space.xs) {
                 Text(summary(plan)).monospacedDigit().foregroundStyle(.secondary)
                 if case .tooLong(let seconds) = plan.fit {
-                    Label("Too long by \(DVDPlan.approximateText(seconds)). Remove a video or use a dual-layer disc.", systemImage: "exclamationmark.triangle.fill")
+                    Label("Too long by \(DVDPlan.approximateText(seconds)). Remove a video or use a \(dvd.format == .dvd ? "dual-layer disc" : "50 GB disc").", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(Surface.warning)
                 }
             }
@@ -69,12 +75,12 @@ struct DVDBar: View {
             if plan.quality == .reduced {
                 Label("Reduced quality: the picture is softer to fit everything.", systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
             }
-            if !isDVD { Label("Based on a single-layer DVD.", systemImage: "info.circle").font(.callout).foregroundStyle(.secondary) }
+            if !isRightDisc { Label(dvd.format == .dvd ? "Based on a single-layer DVD." : "Based on a 25 GB Blu-ray disc.", systemImage: "info.circle").font(.callout).foregroundStyle(.secondary) }
         }
     }
 
-    private var isDVD: Bool {
-        if case .ready(let media) = burn.deviceState { return media.kind == .dvd }
+    private var isRightDisc: Bool {
+        if case .ready(let media) = burn.deviceState { return media.kind == burn.type.mediaKind }
         return false
     }
 

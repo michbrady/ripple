@@ -48,6 +48,7 @@ final class DVDModel: StoppableJob {
     /// How a build is made: the real programs, or a stand-in for snapshots and the self-test.
     @ObservationIgnored var makeMaker: (DVDProject, URL) -> any DVDMaker = { project, work in
         if VideoSources.useFixtures { return FixtureDVDMaker(project: project, work: work) }
+        if project.format == .bluray { return BluRayBuilder(tools: VideoSources.bluRayTools, project: project, work: work) }
         return DVDBuilder(tools: VideoSources.tools, project: project, work: work)
     }
 
@@ -67,6 +68,10 @@ final class DVDModel: StoppableJob {
 
     /// The name at the top of the menu and on the disc.
     var discName = "My Videos"
+    /// Which disc the screen is making. The Disc Type choice sets it; a Blu-ray has no menu and no TV Standard.
+    var format: VideoDiscFormat = .dvd
+    /// The picture shape a Blu-ray gets, from the first video's frame rate.
+    var bluRayMode: BluRayMode { BluRayMode.suggest(for: videos) }
     /// The menu's look.
     var look: MenuLook = .classic
     /// The user's own menu picture and music. A file that cannot be read leaves these empty and sets a problem.
@@ -83,7 +88,7 @@ final class DVDModel: StoppableJob {
     var showsMenu = false
 
     /// `discName` cleaned the way the menu shows it.
-    var cleanDiscName: String { DVDName.cleaned(discName, fallback: "Video DVD", limit: DVDName.maxDisc) }
+    var cleanDiscName: String { DVDName.cleaned(discName, fallback: format == .dvd ? "Video DVD" : "Blu-ray Disc", limit: DVDName.maxDisc) }
 
     /// What the user chose in the bar. `nil` follows the videos.
     var standardChoice: TVStandard?
@@ -107,7 +112,7 @@ final class DVDModel: StoppableJob {
 
     /// The plan on the disc in the drive, or on a single-layer DVD when there is none.
     func plan(on state: BurnDeviceState) -> DVDPlan {
-        DVDPlan(files: videos, standard: standard, capacityBlocks: DVDPlan.capacity(for: state))
+        DVDPlan(files: videos, standard: standard, capacityBlocks: DVDPlan.capacity(for: state, format: format), format: format)
     }
 
     var isBuilding: Bool { if case .building = phase { true } else { false } }
@@ -137,7 +142,7 @@ final class DVDModel: StoppableJob {
     /// Everything the builder needs, from the list and the choices.
     func project(on state: BurnDeviceState) -> DVDProject {
         DVDProject(files: videos, discName: cleanDiscName, standard: standard, widescreen: widescreen, look: look,
-                   background: backgroundURL, music: musicURL, capacityBlocks: DVDPlan.capacity(for: state))
+                   background: backgroundURL, music: musicURL, capacityBlocks: DVDPlan.capacity(for: state, format: format), format: format)
     }
 
     func canBuild(on state: BurnDeviceState) -> Bool {
@@ -186,7 +191,7 @@ final class DVDModel: StoppableJob {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "iso") ?? .data]
         panel.nameFieldStringValue = "\(cleanDiscName).iso"
-        panel.message = "Save the disc as an image you can open in a DVD player app or burn later"
+        panel.message = "Save the disc as an image you can open in a disc player app or burn later"
         panel.prompt = "Save"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         saveImage(to: url)
@@ -410,7 +415,8 @@ final class DVDModel: StoppableJob {
         menuPage = page == .videoScenes ? 2 : 0
         showsMenu = page == .videoMenu || page == .videoMenuDaylight || page == .videoScenes
         look = page == .videoMenuDaylight ? .daylight : .classic
-        guard page == .videoList || page == .videoOver || page == .videoMenu || page == .videoMenuDaylight || page == .videoScenes || page == .videoBuilding || page == .videoFailed || page == .videoDone else { return }
+        format = (page == .bluRayList || page == .bluRayOver || page == .bluRayDone) ? .bluray : .dvd
+        guard page == .bluRayList || page == .bluRayOver || page == .bluRayDone || page == .videoList || page == .videoOver || page == .videoMenu || page == .videoMenuDaylight || page == .videoScenes || page == .videoBuilding || page == .videoFailed || page == .videoDone else { return }
         func video(_ name: String, _ seconds: Double) -> DVDItem {
             let url = URL(fileURLWithPath: "/Movies/\(name).mp4")
             let file = VideoFile(url: url, title: VideoProbe.defaultTitle(for: url), bytes: Int(seconds * 450_000), seconds: seconds,
@@ -418,6 +424,15 @@ final class DVDModel: StoppableJob {
             return DVDItem(url: url, state: .ready(file), picture: FixtureVideoSource.gradient(seed: abs(name.hashValue)))
         }
         items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142)]
+        if page == .bluRayList || page == .bluRayOver || page == .bluRayDone {
+            items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142)]
+            if page == .bluRayOver { items += [video("Wedding", 5_400), video("Honeymoon", 4_800), video("Graduation", 3_900)] }
+            if page == .bluRayOver { items = items.map { var long = $0; if case .ready(var f) = long.state { f.seconds *= 4; long.state = .ready(f) }; return long } }
+            if page == .bluRayDone {
+                phase = .ready(DVDBuildResult(image: URL(fileURLWithPath: "/tmp/disc.iso"), work: URL(fileURLWithPath: "/tmp/ripple-dvd-snapshot"), titles: 4))
+            }
+            return
+        }
         if page == .videoDone {
             items = Array(items.prefix(4))
             phase = .ready(DVDBuildResult(image: URL(fileURLWithPath: "/tmp/disc.iso"), work: URL(fileURLWithPath: "/tmp/ripple-dvd-snapshot"), titles: 4))

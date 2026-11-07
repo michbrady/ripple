@@ -740,3 +740,43 @@ Acceptance:
 - [manual] Dragging a file onto a folder, and a file or folder from Finder onto a folder, puts it there.
 Status: doing
 Note: Drag and drop is not yet tried by hand. The context menu (Move to Folder, Move Up, Move Down) does the same without dragging. An Audio CD has no folders and ignores them.
+
+## M8 Blu-ray
+A Blu-ray Disc is the fourth Disc Type: the same video list and screen as the Video DVD, no menu, high definition. ffmpeg converts each video to 1080 or 720 H.264 with AC-3 sound in a Matroska file, and tsMuxeR (Apache 2.0, a separate program) joins them into one program with a chapter per video and writes the disc image (UDF 2.5, which `hdiutil` cannot make). The picture shape comes from the first video's frame rate (1080p24, 1080i25 or 29.97, 720p50 or 59.94). Scope chosen 2026-11-07: no menu. Menus would need hand-built Blu-ray menu files.
+
+### S-053 Choose Blu-ray Disc
+As the user, I pick Blu-ray Disc as a fourth kind of disc, and the screen asks for a blank BD-R or BD-RE.
+Screens: burn-bluRayList, burn-bluRayOver
+Depends: S-039
+Acceptance:
+- [unit] `DiscType.bluray` has a title, a summary, and media kind Blu-ray; the plan uses 25 GB (12,219,392 blocks) and 50 GB, and a quality scale of 12, 8, and 5 Mbps.
+- [self] A blank BD-R is accepted, a DVD-R is refused for a Blu-ray Disc and a BD-R for a Video DVD, each with a line that says which disc to insert.
+- [snap] The list shows the picture shape ("1080i29.97") and that there is no menu; too much video says "Too long by ... use a 50 GB disc".
+Status: done
+
+### S-054 Build a Blu-ray image
+As the user, I press Build Disc and get a Blu-ray image, with the same bar, Cancel, failure, and Save Disc Image as the Video DVD.
+Screens: burn-bluRayDone
+Depends: S-053
+Acceptance:
+- [unit] The ffmpeg command and the tsMuxeR instructions (chapters, joined files, label) are as written in `BluRayPlanTests`.
+- [self] The build runs against the stand-in maker and burns as a Blu-ray job; with the real programs inside the installed app it makes an image that mounts and holds `BDMV` and a stream.
+- [unit] With the real ffmpeg and tsMuxeR: the playlist has one chapter per video, the stream is 1080 H.264 with AC-3 and as long as both videos, and the volume carries the disc's name (`BluRayRealBuildTests`).
+Status: done
+Note: See the FIXLOG entry about the empty playlist.
+
+### S-055 Burn a Blu-ray
+As the user, I burn the image to a blank BD-R or BD-RE.
+Depends: S-054
+Acceptance:
+- [self] A Blu-ray image is burned as one job with the other kinds' stages and Cancel.
+- [manual] A blank BD-R in a Blu-ray burner takes the image, and the disc plays in a Blu-ray player with Next skipping between videos.
+Status: doing
+Note: Built on the same `DRBurn.layout(forImageFile:)` path as the Video DVD. Not tried on a real disc, and the burner used for the DVD may not write Blu-ray.
+
+### S-056 Carry and credit tsMuxeR
+As the user, I need the Blu-ray tool inside Ripple, signed, with its licence.
+Depends: S-054
+Acceptance:
+- [self] `tools/fetch-tsmuxer.sh` checks a known checksum; `build.sh` bundles and signs it; the About window and `DVD-TOOLS-NOTICE.txt` credit it, with the Apache licence text.
+Status: done

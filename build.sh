@@ -54,6 +54,11 @@ if [[ -x "$dvdbin/bin/dvdauthor" && -x "$dvdbin/bin/spumux" ]]; then
   cp "$dvdbin/bin/dvdauthor" "$dvdbin/bin/spumux" "$app/Contents/Resources/bin/"
   cp "$dvdbin/lib/"*.dylib "$app/Contents/Resources/lib/"
 fi
+# tsMuxeR (tools/fetch-tsmuxer.sh) writes the Blu-ray disc image.
+if [[ -x "$here/.dvdtools/tsMuxeR" ]]; then
+  mkdir -p "$app/Contents/Resources/bin"
+  cp "$here/.dvdtools/tsMuxeR" "$app/Contents/Resources/bin/tsMuxeR"
+fi
 if [[ -d "$app/Contents/Resources/bin" ]]; then
   cp "$here/vendor/dvdtools/"* "$app/Contents/Resources/Licenses/"
 fi

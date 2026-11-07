@@ -435,8 +435,12 @@ import Testing
 }
 
 @Suite struct DiscTypeTests {
-    @Test func videoDVDIsTheThirdDiscType() {
-        #expect(DiscType.allCases == [.audio, .data, .video])
+    @Test func videoDVDIsTheThirdDiscTypeAndBluRayTheFourth() {
+        #expect(DiscType.allCases == [.audio, .data, .video, .bluray])
+        #expect(DiscType.bluray.title == "Blu-ray Disc")
+        #expect(DiscType.bluray.isVideo && DiscType.video.isVideo && !DiscType.data.isVideo)
+        #expect(DiscType.bluray.mediaKind == .bluray && DiscType.video.mediaKind == .dvd && DiscType.audio.mediaKind == .cd)
+        #expect(DiscType.bluray.videoFormat == .bluray)
         #expect(DiscType.video.title == "Video DVD")
         #expect(!DiscType.video.summary.isEmpty)
         #expect(DiscType(rawValue: "video") == .video)

@@ -1,4 +1,4 @@
-Ripple makes a Video DVD with three separate programs. They are not part of Ripple's own code. Ripple starts them as ordinary programs and talks to them through their command lines, files, and standard input and output.
+Ripple makes a Video DVD with three separate programs, and a Blu-ray Disc with two (FFmpeg and tsMuxeR). They are not part of Ripple's own code. Ripple starts them as ordinary programs and talks to them through their command lines, files, and standard input and output.
 
 They live in Ripple.app/Contents/Resources/bin, and the libraries two of them use are in Ripple.app/Contents/Resources/lib. You may replace any of them with your own build.
 
@@ -14,5 +14,10 @@ dvdauthor and spumux 0.7.2
   Built by Ripple's tools/build-dvdauthor.sh from that source, with these libraries copied next to them:
     libpng (PNG licence), FreeType (FreeType Licence or GPL version 2), and Brotli (MIT licence).
   Ripple's build does not include or link libdvdcss or any other library that decrypts copy-protected discs. Ripple does not read copy-protected video.
+
+tsMuxeR 2.7.0 (from github.com/justdan96/tsMuxer)
+  Licence: Apache License, version 2.0. The licence text is in LICENSE-tsMuxeR-Apache-2.0.txt.
+  Source and project: https://github.com/justdan96/tsMuxer
+  What Ripple uses it for: joining the converted videos into one program and writing the Blu-ray disc image.
 
 The source code of each program is available at the addresses above.

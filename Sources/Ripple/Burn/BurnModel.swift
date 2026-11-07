@@ -74,7 +74,7 @@ final class BurnModel: StoppableJob {
 
     var isReady: Bool {
         guard case .ready(let media) = deviceState else { return false }
-        return type != .video || media.kind == .dvd
+        return !type.isVideo || media.kind == type.mediaKind
     }
 
     var canBurn: Bool { phase == .editing && isReady && fit == .fits }
@@ -91,12 +91,13 @@ final class BurnModel: StoppableJob {
             case .audio: "Insert a blank CD-R."
             case .data: "Insert a blank CD-R or DVD-R."
             case .video: "Insert a blank DVD-R or DVD-RW."
+            case .bluray: "Insert a blank BD-R or BD-RE."
             }
         case .notBlank(let label, let rewritable):
             rewritable ? "This \(label) is not blank. Erase it in Disk Utility, then insert it again."
                        : "This \(label) is not blank. Insert a blank disc."
         case .ready(let media):
-            type == .video && media.kind != .dvd ? "Insert a blank DVD-R or DVD-RW. This disc is a \(media.label)." : "\(deviceName) \u{00B7} blank \(media.label)"
+            type.isVideo && media.kind != type.mediaKind ? "\(deviceLine(for: .noDisc, type: type)) This disc is a \(media.label)." : "\(deviceName) \u{00B7} blank \(media.label)"
         }
     }
 
@@ -305,16 +306,17 @@ final class BurnModel: StoppableJob {
     func imageProblem(bytes: Int, on state: BurnDeviceState? = nil) -> String? {
         guard phase == .editing else { return "Another disc is being burned." }
         let state = state ?? deviceState
-        guard case .ready(let media) = state, media.kind == .dvd else { return deviceLine(for: state, type: .video) }
+        let videoType = type.isVideo ? type : .video
+        guard case .ready(let media) = state, media.kind == videoType.mediaKind else { return deviceLine(for: state, type: videoType) }
         let blocks = (bytes + 2_047) / 2_048
-        return blocks > media.blocksFree ? "This \(media.label) is too small for the disc. Insert a blank DVD-R or DVD-RW with more room." : nil
+        return blocks > media.blocksFree ? "This \(media.label) is too small for the disc. \(videoType == .bluray ? "Insert a blank BD-R or BD-RE with more room." : "Insert a blank DVD-R or DVD-RW with more room.")" : nil
     }
 
     /// Burns a finished disc image (a Video DVD) with the same stages, Cancel, and messages as any other burn.
     func burnImage(_ image: URL, volumeName: String) {
         guard let size = try? image.resourceValues(forKeys: [.fileSizeKey]).fileSize, imageProblem(bytes: size) == nil else { return }
-        type = .video
-        run(BurnJob(type: .video, files: [image], volumeName: volumeName))
+        if !type.isVideo { type = .video }
+        run(BurnJob(type: type, files: [image], volumeName: volumeName))
     }
 
     private func run(_ job: BurnJob) {
@@ -327,7 +329,7 @@ final class BurnModel: StoppableJob {
                     Task { @MainActor in self?.stage(stage) }
                 }
                 self?.phase = .done
-                if job.type == .video { self?.didFinishVideoBurn?() }
+                if job.type.isVideo { self?.didFinishVideoBurn?() }
             } catch is CancellationError {
                 self?.phase = .editing
             } catch {
@@ -417,6 +419,10 @@ final class BurnModel: StoppableJob {
             type = .video
             items = []
             deviceState = FixtureBurner.blankDVD()
+        case .bluRayList, .bluRayOver, .bluRayDone:
+            type = .bluray
+            items = []
+            deviceState = FixtureBurner.blankBluRay()
         case .videoEmpty:
             type = .video
             items = []
@@ -446,5 +452,5 @@ final class BurnModel: StoppableJob {
 }
 
 enum BurnSnapshotPage: String, CaseIterable {
-    case empty, list, folders, noDisc, over, dvd, burning, done, failed, videoEmpty, videoList, videoOver, videoMenu, videoMenuDaylight, videoBuilding, videoFailed, videoDone, videoScenes
+    case empty, list, folders, noDisc, over, dvd, burning, done, failed, videoEmpty, videoList, videoOver, videoMenu, videoMenuDaylight, videoBuilding, videoFailed, videoDone, videoScenes, bluRayList, bluRayOver, bluRayDone
 }

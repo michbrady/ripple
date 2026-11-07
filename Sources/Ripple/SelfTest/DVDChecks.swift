@@ -7,7 +7,7 @@ import RippleKit
 extension SelfTest {
     static func dvdChecks(burn: BurnModel, dvd: DVDModel) async {
         // S-039: Video DVD is the third Disc Type, remembered, and asks for a DVD, not a CD.
-        check("Disc Type has three choices, Video DVD last", DiscType.allCases.map(\.title) == ["Audio CD", "MP3 Disc", "Video DVD"])
+        check("Disc Type has four choices, Blu-ray last", DiscType.allCases.map(\.title) == ["Audio CD", "MP3 Disc", "Video DVD", "Blu-ray Disc"])
         burn.showSnapshot(.videoEmpty)
         check("Video DVD is remembered", Store.defaults.string(forKey: "burn.type") == "video")
         check("a blank DVD-R is accepted for a Video DVD", burn.isReady && burn.deviceLine.contains("blank DVD-R"), burn.deviceLine)
@@ -23,6 +23,7 @@ extension SelfTest {
         await menuMediaChecks()
         await buildChecks(burn: burn, dvd: dvd)
         await burnImageChecks(burn: burn, dvd: dvd)
+        await bluRayChecks(burn: burn, dvd: dvd)
     }
 
     /// S-040: dropped files and folders become rows; other files are counted and skipped; bad videos say why.
@@ -359,5 +360,27 @@ extension SelfTest {
         _ = try? await ProcessRunner.run(URL(fileURLWithPath: "/usr/bin/hdiutil"), ["detach", mount.path, "-force"])
         dvd.startOver()
         check("Start Over removes the work folder", !fm.fileExists(atPath: result.work.path))
+
+        // The same two videos as a Blu-ray, with the app's own ffmpeg and tsMuxeR.
+        check("the app carries tsMuxeR", fm.isExecutableFile(atPath: VideoSources.bluRayTools.tsmuxer.path))
+        burn.showSnapshot(.bluRayList)
+        dvd.showSnapshot(.empty)
+        dvd.format = .bluray
+        await dvd.add(made)
+        dvd.makeMaker = { project, work in BluRayBuilder(tools: VideoSources.bluRayTools, project: project, work: work) }
+        dvd.build(on: burn.deviceState)
+        await wait(until: { !dvd.isBuilding }, seconds: 180)
+        guard case .ready(let blu) = dvd.phase else { return check("the real Blu-ray build finished", false, "\(dvd.phase)") }
+        let bluSize = (try? blu.image.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        check("the real build made a Blu-ray image", bluSize > 1_000_000 && blu.titles == 2, "\(bluSize) bytes, \(blu.titles) titles")
+        let bluMount = folder.appending(path: "blumount")
+        try? fm.createDirectory(at: bluMount, withIntermediateDirectories: true)
+        let bluAttach = try? await ProcessRunner.run(URL(fileURLWithPath: "/usr/bin/hdiutil"), ["attach", "-readonly", "-nobrowse", "-mountpoint", bluMount.path, blu.image.path])
+        check("the Blu-ray image mounts", bluAttach?.status == 0)
+        check("it holds the BDMV files and a video stream", fm.fileExists(atPath: bluMount.appending(path: "BDMV/index.bdmv").path)
+              && ((try? fm.contentsOfDirectory(atPath: bluMount.appending(path: "BDMV/STREAM").path)) ?? []).contains { $0.hasSuffix(".m2ts") })
+        _ = try? await ProcessRunner.run(URL(fileURLWithPath: "/usr/bin/hdiutil"), ["detach", bluMount.path, "-force"])
+        dvd.startOver()
+        dvd.format = .dvd
     }
 }

@@ -39,3 +39,5 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | Menu Music | A sound file that plays under the Menu | soundtrack, audio |
 | Scenes | A page of chapter pictures for one Title; its button is on the Menu | chapters page, scene selection |
 | Disc Name | The name shown at the top of the Menu and as the disc's volume name | label, volume name |
+| Blu-ray Disc | A disc of videos in high definition that plays at once in any Blu-ray player, with no menu. The fourth Disc Type | BD, HD DVD |
+| Chapter (Blu-ray) | The start of each video on a Blu-ray Disc; the remote's Next button skips to it | scene, track |

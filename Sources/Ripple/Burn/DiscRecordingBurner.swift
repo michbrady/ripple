@@ -22,7 +22,7 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
         return devices.first { device in
             let info = device.info() as? [String: Any] ?? [:]
             let write = info[DRDeviceWriteCapabilitiesKey] as? [String: Any] ?? [:]
-            return [DRDeviceCanWriteCDRKey, DRDeviceCanWriteDVDRKey].contains { (write[$0] as? Bool) == true }
+            return [DRDeviceCanWriteCDRKey, DRDeviceCanWriteDVDRKey, DRDeviceCanWriteBDKey].contains { (write[$0] as? Bool) == true }
         }
     }
 
@@ -40,6 +40,7 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
         let kind: BurnMedia.Kind = switch media[DRDeviceMediaClassKey] as? String {
         case DRDeviceMediaClassCD: .cd
         case DRDeviceMediaClassDVD: .dvd
+        case DRDeviceMediaClassBD: .bluray
         default: .other
         }
         return .ready(BurnMedia(kind: kind, label: label, blocksFree: (media[DRDeviceMediaBlocksFreeKey] as? Int) ?? 0))
@@ -55,6 +56,8 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
         case DRDeviceMediaTypeDVDPlusR: "DVD+R"
         case DRDeviceMediaTypeDVDPlusRW: "DVD+RW"
         case DRDeviceMediaTypeDVDRAM: "DVD-RAM"
+        case DRDeviceMediaTypeBDR: "BD-R"
+        case DRDeviceMediaTypeBDRE: "BD-RE"
         case .some(let other): other.replacingOccurrences(of: "DRDeviceMediaType", with: "disc")
         case nil: "disc"
         }
@@ -114,7 +117,7 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
                 (folders[entry.folder] ?? root).addChild(item)
             }
             layout = DRTrack(forRootFolder: root) as Any
-        case .video:
+        case .video, .bluray:
             // The finished disc image, written as it is. Nothing is prepared, so Cancel works until writing starts.
             guard let image = job.files.first, let imageLayout = DRBurn.layout(forImageFile: image.path) else {
                 throw BurnError.discRejected("The disc image could not be read.")

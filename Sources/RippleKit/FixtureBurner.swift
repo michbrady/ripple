@@ -27,6 +27,10 @@ public final class FixtureBurner: DiscBurner, @unchecked Sendable {
         .ready(BurnMedia(kind: .dvd, label: "DVD-R", blocksFree: blocks))
     }
 
+    public static func blankBluRay(blocks: Int = 12_219_392) -> BurnDeviceState {
+        .ready(BurnMedia(kind: .bluray, label: "BD-R", blocksFree: blocks))
+    }
+
     public var jobs: [BurnJob] { lock.withLock { burned } }
     public var ejectCount: Int { lock.withLock { ejected } }
 

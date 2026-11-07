@@ -25,6 +25,12 @@ enum VideoSources {
         return DVDTools(ffmpeg: ffmpeg ?? bin.appending(path: "ffmpeg"), dvdauthor: bin.appending(path: "dvdauthor"), spumux: bin.appending(path: "spumux"))
     }
 
+    /// The programs a Blu-ray build runs, inside the app.
+    static var bluRayTools: BluRayTools {
+        let bin = Bundle.main.resourceURL?.appending(path: "bin") ?? URL(fileURLWithPath: "/nonexistent")
+        return BluRayTools(ffmpeg: ffmpeg ?? bin.appending(path: "ffmpeg"), tsmuxer: bin.appending(path: "tsMuxeR"))
+    }
+
     /// ffmpeg inside the app, or the one RIPPLE_FFMPEG names while the tools are not yet carried (S-048).
     static var ffmpeg: URL? {
         let candidates = [Bundle.main.resourceURL?.appending(path: "bin/ffmpeg"),

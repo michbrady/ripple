@@ -8,6 +8,15 @@ public enum DiscType: String, CaseIterable, Identifiable, Sendable {
     case data
     /// A Video DVD: videos with a menu, made by `DVDBuilder`. It plays in any DVD player.
     case video
+    /// A Blu-ray Disc: videos that play at once in order, made by `BluRayBuilder`. It plays in any Blu-ray player.
+    case bluray
+
+    /// Both kinds of video disc: they share one screen and one image-burning path.
+    public var isVideo: Bool { self == .video || self == .bluray }
+    /// The kind of blank disc this type goes on.
+    public var mediaKind: BurnMedia.Kind { self == .audio ? .cd : self == .bluray ? .bluray : .dvd }
+    /// The video disc format, for the two video types.
+    public var videoFormat: VideoDiscFormat? { self == .video ? .dvd : self == .bluray ? .bluray : nil }
 
     public var id: String { rawValue }
     public var title: String {
@@ -15,6 +24,7 @@ public enum DiscType: String, CaseIterable, Identifiable, Sendable {
         case .audio: "Audio CD"
         case .data: "MP3 Disc"
         case .video: "Video DVD"
+        case .bluray: "Blu-ray Disc"
         }
     }
     public var summary: String {
@@ -22,13 +32,14 @@ public enum DiscType: String, CaseIterable, Identifiable, Sendable {
         case .audio: "Standard audio CD. Plays in old CD players, car stereos, and boom boxes. Holds about 80 minutes."
         case .data: "Holds many hours, with folders if you like. Needs a player that reads MP3 files. M4A files are converted to MP3."
         case .video: "Plays in any DVD player, with a menu. Holds about 2 hours of video."
+        case .bluray: "Plays in any Blu-ray player, in high definition, with no menu. A 25 GB disc holds hours of video, more at lower quality."
         }
     }
 }
 
 /// The disc in the burner.
 public struct BurnMedia: Equatable, Sendable {
-    public enum Kind: Equatable, Sendable { case cd, dvd, other }
+    public enum Kind: Equatable, Sendable { case cd, dvd, bluray, other }
 
     public var kind: Kind
     /// "CD-R", "DVD-R", and so on.
@@ -91,8 +102,8 @@ public struct BurnPlan: Equatable, Sendable {
             return items.reduce(0) { $0 + Int((($1.seconds * Double(Self.sectorsPerSecond))).rounded(.up)) + Self.gapBlocks }
         case .data:
             return items.reduce(0) { $0 + ($1.discBytes + 2_047) / 2_048 } + Self.dataOverheadBlocks
-        case .video:
-            return 0   // a Video DVD is planned by DVDPlan, not by music files
+        case .video, .bluray:
+            return 0   // a video disc is planned by DVDPlan, not by music files
         }
     }
 
@@ -122,7 +133,7 @@ public struct BurnPlan: Equatable, Sendable {
         case .audio:
             let minutes = Int((Double(blocks) / Double(Self.sectorsPerSecond) / 60).rounded(.up))
             return "\(minutes) min over"
-        case .data, .video:
+        case .data, .video, .bluray:
             let megabytes = Int((Double(blocks) * 2_048 / 1_048_576).rounded(.up))
             return "\(megabytes) MB over"
         }
@@ -134,7 +145,7 @@ public struct BurnPlan: Equatable, Sendable {
         switch type {
         case .audio:
             return "\(Int((Double(blocksNeeded) / Double(Self.sectorsPerSecond) / 60).rounded(.up))) min of \(capacity / Self.sectorsPerSecond / 60) min"
-        case .data, .video:
+        case .data, .video, .bluray:
             return "\(Int((Double(blocksNeeded) * 2_048 / 1_048_576).rounded(.up))) MB of \(capacity * 2_048 / 1_048_576) MB"
         }
     }

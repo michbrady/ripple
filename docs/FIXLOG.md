@@ -2,6 +2,12 @@
 
 Bugs found while building, newest first. Each ends with a rule.
 
+## A Blu-ray image with video in it but an empty playlist (M8, found by reading the playlist, not by the test passing)
+Symptom: The first Blu-ray build passed its test (image mounts, BDMV folders, a `.m2ts` stream) but the playlist file (`00000.mpls`) was 88 bytes, with no play items and one chapter mark. A player would show a disc with nothing to play.
+Cause: tsMuxeR was given bare `.264` and `.ac3` files. It wrote the stream but could not read the clip's length, so the playlist came out empty and `--custom-chapters` was ignored.
+Fix: ffmpeg writes one Matroska file per video (picture and sound together), and tsMuxeR joins them with `"a.mkv"+"b.mkv"`. The playlist then has its play item, and one chapter per video. The real-tools test now parses the playlist's chapter count and asks ffmpeg for the stream's codec, size, and length.
+Rule: A test that finds files is not a test that finds a disc that plays. Read the part a player reads (here the playlist) and assert what it says.
+
 ## A test could have trashed my user's real installer (M6, caught before it did any harm)
 Symptom: The installer-cleanup self-test recorded a "Keep" for `~/Downloads/Ripple.dmg`, a file the user had really downloaded and opened, and its later "yes" steps then failed.
 Cause: The test asked the real finder for open disk images, and the finder returns the first Ripple installer it sees, which was the user's, not the test's. Only a faked "no" ran against it. A faked "yes" would have ejected and trashed the real file.

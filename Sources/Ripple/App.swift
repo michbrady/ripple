@@ -44,14 +44,14 @@ struct RippleApp: App {
                 Button("Rip Checked Tracks") { model.mode = .rip; model.rip() }
                     .keyboardShortcut("r")
                     .disabled(model.mode == .burn || model.phase != .ready || model.checkedCount == 0)
-                Button(burn.type == .video ? "Build Disc" : "Burn Disc") {
-                    if burn.type == .video { dvd.build(on: burn.deviceState) } else { burn.burn() }
+                Button(burn.type.isVideo ? "Build Disc" : "Burn Disc") {
+                    if burn.type.isVideo { dvd.build(on: burn.deviceState) } else { burn.burn() }
                 }
                 .keyboardShortcut("b")
-                .disabled(model.mode == .rip || (burn.type == .video ? !dvd.canBuild(on: burn.deviceState) : !burn.canBurn))
+                .disabled(model.mode == .rip || (burn.type.isVideo ? !dvd.canBuild(on: burn.deviceState) : !burn.canBurn))
                 Button("Add Videos…") { dvd.chooseVideos() }
                     .keyboardShortcut("o")
-                    .disabled(model.mode == .rip || burn.type != .video || burn.phase != .editing)
+                    .disabled(model.mode == .rip || !burn.type.isVideo || burn.phase != .editing)
                 Button("Eject Disc") { model.mode == .burn ? burn.eject() : model.eject() }
                     .keyboardShortcut("e")
                     .disabled(model.mode == .burn ? burn.isBusy : !model.hasDisc)
@@ -59,10 +59,10 @@ struct RippleApp: App {
             CommandGroup(after: .pasteboard) {
                 Button("Move Video Up") { dvd.moveSelectionUp() }
                     .keyboardShortcut(.upArrow, modifiers: [.command, .option])
-                    .disabled(model.mode == .rip || burn.type != .video || !dvd.canMoveUp)
+                    .disabled(model.mode == .rip || !burn.type.isVideo || !dvd.canMoveUp)
                 Button("Move Video Down") { dvd.moveSelectionDown() }
                     .keyboardShortcut(.downArrow, modifiers: [.command, .option])
-                    .disabled(model.mode == .rip || burn.type != .video || !dvd.canMoveDown)
+                    .disabled(model.mode == .rip || !burn.type.isVideo || !dvd.canMoveDown)
                 Button("Check All Tracks") { for index in model.rows.indices { model.rows[index].include = true } }
                     .keyboardShortcut("a", modifiers: [.command, .option])
                     .disabled(model.phase != .ready)
@@ -138,11 +138,12 @@ enum AboutPanel {
             The licence and source notice are in the app's Resources/Licenses folder. \
             Video DVDs are made with FFmpeg (ffmpeg.org) and dvdauthor and spumux (dvdauthor.sourceforge.net), \
             used under the GNU General Public License as separate programs inside the app. \
+            Blu-ray Discs use tsMuxeR (github.com/justdan96/tsMuxer), under the Apache License 2.0, also a separate program. \
             Their licences, version numbers, and where to get their source are in the same folder. \
             Album details from MusicBrainz. Cover pictures from the Cover Art Archive and the iTunes Search API.
             """, attributes: body))
         credits.append(NSAttributedString(string: "\n\n", attributes: body))
-        for (name, link) in [("FFmpeg", AppLinks.ffmpeg), ("dvdauthor", AppLinks.dvdauthor)] {
+        for (name, link) in [("FFmpeg", AppLinks.ffmpeg), ("dvdauthor", AppLinks.dvdauthor), ("tsMuxeR", AppLinks.tsMuxeR)] {
             credits.append(NSAttributedString(string: name, attributes: [.font: NSFont.systemFont(ofSize: 11), .link: link]))
             credits.append(NSAttributedString(string: "  \u{00B7}  ", attributes: body))
         }

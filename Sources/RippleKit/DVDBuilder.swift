@@ -24,14 +24,16 @@ public struct DVDProject: Sendable {
     public var background: URL?
     public var music: URL?
     public var capacityBlocks: Int
+    public var format: VideoDiscFormat
 
     public init(files: [VideoFile], discName: String, standard: TVStandard, widescreen: Bool, look: MenuLook = .classic,
-                background: URL? = nil, music: URL? = nil, capacityBlocks: Int = DVDPlan.singleLayerBlocks) {
+                background: URL? = nil, music: URL? = nil, capacityBlocks: Int? = nil, format: VideoDiscFormat = .dvd) {
         self.files = files; self.discName = discName; self.standard = standard; self.widescreen = widescreen
-        self.look = look; self.background = background; self.music = music; self.capacityBlocks = capacityBlocks
+        self.look = look; self.background = background; self.music = music; self.format = format
+        self.capacityBlocks = capacityBlocks ?? format.singleLayerBlocks
     }
 
-    public var plan: DVDPlan { DVDPlan(files: files, standard: standard, capacityBlocks: capacityBlocks) }
+    public var plan: DVDPlan { DVDPlan(files: files, standard: standard, capacityBlocks: capacityBlocks, format: format) }
 }
 
 public enum DVDBuildStage: Equatable, Sendable {

@@ -42,7 +42,7 @@ struct DVDReady: View {
     @State private var confirmingDiscard = false
     let result: DVDBuildResult
 
-    /// Why Burn Disc is off: no blank DVD, a CD, or a disc that is too small. Save Disc Image works either way.
+    /// Why Burn Disc is off: no blank disc of the right kind, a CD, or a disc that is too small. Save Disc Image works either way.
     private var problem: String? {
         let size = (try? result.image.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         return burn.imageProblem(bytes: size)
@@ -53,7 +53,7 @@ struct DVDReady: View {
             Label("Disc Ready", systemImage: "checkmark.circle")
         } description: {
             VStack(spacing: Space.xs) {
-                Text("Your Video DVD is ready: \(result.titles) \(result.titles == 1 ? "video" : "videos"), \(DVDPlan.approximateText(dvd.totalSeconds)).")
+                Text("Your \(burn.type.title) is ready: \(result.titles) \(result.titles == 1 ? "video" : "videos"), \(DVDPlan.approximateText(dvd.totalSeconds)).")
                 if let saved = dvd.savedImage {
                     Label("Saved as \(saved.lastPathComponent).", systemImage: "checkmark").foregroundStyle(.secondary)
                 }
@@ -64,9 +64,9 @@ struct DVDReady: View {
                 Button("Burn Disc") { burn.burnImage(result.image, volumeName: dvd.cleanDiscName) }
                     .keyboardShortcut(.defaultAction)
                     .disabled(problem != nil)
-                    .help(problem ?? "Burn the disc to the blank DVD in the drive")
+                    .help(problem ?? "Burn the disc to the blank \(dvd.format == .dvd ? "DVD" : "Blu-ray disc") in the drive")
                 Button("Save Disc Image\u{2026}") { dvd.chooseImageDestination() }
-                    .help("Save the disc as an .iso file to open in a DVD player app or burn later")
+                    .help("Save the disc as an .iso file to open in a disc player app or burn later")
                 if let saved = dvd.savedImage {
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([saved]) }
                 }
