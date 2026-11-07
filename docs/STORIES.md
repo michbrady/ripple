@@ -617,7 +617,8 @@ UX:
 - States: while redrawing, keep the old page; no spinner under half a second
 - Words: "Page 2 of 3"; tooltips "Show the next menu page" and "Show the previous menu page"
 - Access: ← and → move between pages when the preview has focus
-Status: todo
+Status: done
+Note: The Menu inspector from S-044 is the preview. It redraws when a title, the look, the disc name, or the picture changes (`DVDModel.menuKey`, checked in the self-test), and drawing it starts no program. Snapshot page: `burn-videoMenu`.
 
 ### S-045 Build the disc
 As the user, I press Build and Ripple converts the videos, makes the menu, and prepares the disc, with a bar and a Cancel button.

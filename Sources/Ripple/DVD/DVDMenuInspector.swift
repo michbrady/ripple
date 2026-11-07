@@ -21,7 +21,7 @@ struct DVDMenuInspector: View {
             Spacer(minLength: 0)
         }
         .padding(Space.lg)
-        .task(id: key) { render() }
+        .task(id: dvd.menuKey) { render() }
     }
 
     private var preview: some View {
@@ -86,14 +86,6 @@ struct DVDMenuInspector: View {
         .buttonStyle(.borderless)
         .onKeyPress(.leftArrow) { page = max(0, page - 1); return .handled }
         .onKeyPress(.rightArrow) { page = min(pages.count - 1, page + 1); return .handled }
-    }
-
-    /// Changes whenever the menu would look different.
-    private var key: String {
-        let titles = dvd.items.compactMap { item -> String? in
-            if case .ready(let file) = item.state { return "\(file.title)|\(item.picture != nil)" } else { return nil }
-        }
-        return "\(dvd.cleanDiscName)#\(dvd.standard.rawValue)#\(dvd.look.rawValue)#\(dvd.backgroundURL?.path ?? "")#\(titles.joined(separator: "#"))"
     }
 
     /// Draws the pages. Nothing is converted: this is Ripple's own drawing.

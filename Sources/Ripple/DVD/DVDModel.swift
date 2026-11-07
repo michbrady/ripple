@@ -153,6 +153,14 @@ final class DVDModel: StoppableJob {
         return (videos, skipped)
     }
 
+    /// Changes whenever the menu would look different, so the preview redraws. It starts no program and converts nothing.
+    var menuKey: String {
+        let titles = items.compactMap { item -> String? in
+            if case .ready(let file) = item.state { return "\(file.title)|\(item.picture != nil)" } else { return nil }
+        }
+        return "\(cleanDiscName)#\(standard.rawValue)#\(look.rawValue)#\(backgroundURL?.path ?? "")#\(titles.joined(separator: "#"))"
+    }
+
     // MARK: Menu picture and music
 
     /// The longest stretch of music the menu uses; a longer file plays this much, then repeats.

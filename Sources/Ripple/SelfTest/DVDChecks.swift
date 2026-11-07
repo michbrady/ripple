@@ -171,6 +171,24 @@ extension SelfTest {
         check("music that cannot be read is named, and the menu stays as it was", dvd.musicProblem?.contains("tune.mp3") == true && dvd.musicURL == music)
         dvd.removeMusic()
         check("Remove goes back to silence", dvd.musicURL == nil && dvd.musicSeconds == 0)
+        // S-052: the preview redraws when a title, the look, the disc name, or the picture changes.
+        let before = dvd.menuKey
+        dvd.showSnapshot(.videoMenu)
+        let base = dvd.menuKey
+        dvd.rename(dvd.items[0].id, to: "Renamed")
+        let renamed = dvd.menuKey
+        dvd.look = .warm
+        let looked = dvd.menuKey
+        dvd.discName = "Another"
+        let named = dvd.menuKey
+        dvd.setBackground(picture)
+        let pictured = dvd.menuKey
+        check("the preview changes with a rename, the look, the disc name, and the picture",
+              Set([base, renamed, looked, named, pictured]).count == 5 && before != base)
+        let scratch = fm.temporaryDirectory.appending(path: "ripple-preview-\(UUID().uuidString)")
+        _ = DVDMenuRenderer.render(discName: dvd.cleanDiscName, titles: [DVDMenuTitle(name: "One")], standard: dvd.standard, look: dvd.look)
+        check("drawing the preview converts nothing and makes no files", !fm.fileExists(atPath: scratch.path) && dvd.items.count == 7)
+        dvd.showSnapshot(.empty)
         let titles = [DVDMenuTitle(name: "One")]
         let plain = DVDMenuRenderer.render(discName: "Own", titles: titles, standard: .ntsc)[0].picture
         let withPicture = DVDMenuRenderer.render(discName: "Own", titles: titles, standard: .ntsc, background: dvd.backgroundImage ?? FixtureVideoSource.gradient(seed: 3))[0].picture
