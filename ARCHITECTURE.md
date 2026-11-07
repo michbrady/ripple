@@ -23,6 +23,7 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 - `FileNamer`: safe names (`/` and `:`, NFC, 255 bytes, duplicates).
 - `MusicBrainz`, `MusicBrainzClient`, `AlbumMatch`, `CoverArt`: lookup, rate limit and retry, cover fetch with an iTunes fallback.
 - `BurnScanner`, `BurnItem`, `BurnPlan`, `BurnJob`, `DiscBurner` (protocol), `FixtureBurner`: everything burn mode decides, with no UI and no drive. `BurnPlan` counts blocks (CD audio sectors, 2 KB data blocks) and says whether the files fit.
+- Video DVD (not yet called from the app): `VideoProbe` and `VideoFile` read a video's length, size, and aspect with ffmpeg; `DVDPlan` decides what fits (bitrate, blocks, TV standard). `DVDAuthoring` builds the argument lists and XML for ffmpeg, spumux, and dvdauthor (pure text, no processes). `DVDMenu` lays out and draws the menu pages and button overlays. `ProcessRunner` starts a program with progress lines and cancel, and stops all of them on quit. `DVDBuilder` runs the whole pipeline (pictures, menus, convert, author, image) and removes everything on failure or cancel. `DVDMaker` (protocol) is the seam; `DVDBuilder` is the real one and `FixtureDVDMaker` reports the same stages and writes a stand-in image.
 - `AlbumDraft`, `TrackRow`: the album as shown. The one place that decides whether a lookup or the user's typing wins.
 
 ## Seams
@@ -32,6 +33,7 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 | `AudioDisc` | `DeviceDisc` (real drive), `FixtureDisc` (tones, for tests and machines with no drive; it can fail, recover, or return wrong data to test `SectorReader`) |
 | `AlbumLookup` (app target) | `LiveLookup` (MusicBrainz, Cover Art Archive), `FixtureLookup` (made-up albums) |
 | `TrackWriter` | `MP3TrackWriter`, `M4ATrackWriter` |
+| `DVDMaker` | `DVDBuilder` (real programs, in RippleKit), `FixtureDVDMaker` (no programs; can fail at a chosen stage) |
 | `DiscBurner` | `DiscRecordingBurner` (the Mac's burner, app target), `FixtureBurner` (records jobs; used by the self-test, snapshots, and test runs) |
 | `MusicBrainzClient.Transport`, `CoverArt.Fetch` | the live network, and fakes in tests |
 
@@ -43,7 +45,7 @@ Dependencies point one way: `Ripple` -> `RippleKit` -> `CLame`. RippleKit never 
 - `BurnModel` (`Burn/`): burn mode. Source Folder, file list with undo, the disc in the drive (watched), Audio CD or MP3 Disc, and the burn. `BurnView` draws it. `AppModel.mode` switches between rip and burn.
 - `StoppableJob`: ripping and burning both conform. The quit prompt asks every busy job (`Jobs.busy`).
 - `ContentView`: window, album header, cover, track list, bottom bar, match picker.
-- `Snapshot`, `SelfTest`: agent modes (`tools/snap.sh`, `tools/selftest.sh`). Both refuse to run unless `APP_STORE` is set, and then use a settings store that is emptied at launch, so they never touch real settings and never leak into each other.
+- `Snapshot`, `SelfTest`: agent modes (`tools/snap.sh`, `tools/selftest.sh`). `SelfTest.swift` holds the entry point and the `check` and `wait` helpers; each group of checks is an extension in `SelfTest/` (`RipChecks`, `BurnChecks`, `DriveChecks`). A new feature adds a file there. Both refuse to run unless `APP_STORE` is set, and then use a settings store that is emptied at launch, so they never touch real settings and never leak into each other.
 
 ## Shipping
 
