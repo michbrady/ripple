@@ -47,7 +47,7 @@ final class DVDModel: StoppableJob {
     @ObservationIgnored private var buildTask: Task<Void, Never>?
     /// How a build is made: the real programs, or a stand-in for snapshots and the self-test.
     @ObservationIgnored var makeMaker: (DVDProject, URL) -> any DVDMaker = { project, work in
-        if Store.isOverridden { return FixtureDVDMaker(project: project, work: work) }
+        if VideoSources.useFixtures { return FixtureDVDMaker(project: project, work: work) }
         return DVDBuilder(tools: VideoSources.tools, project: project, work: work)
     }
 

@@ -316,4 +316,48 @@ extension SelfTest {
         burn.showSnapshot(.empty)
         dvd.showSnapshot(.empty)
     }
+
+    /// RIPPLE_REAL_DVD=1: the app's own copies of the tools read real videos and build a real disc image.
+    static func realDVDChecks(burn: BurnModel, dvd: DVDModel) async {
+        let fm = FileManager.default
+        guard let ffmpeg = VideoSources.ffmpeg else { return check("ffmpeg is inside the app", false) }
+        check("the app carries ffmpeg, dvdauthor, and spumux", [VideoSources.tools.ffmpeg, VideoSources.tools.dvdauthor, VideoSources.tools.spumux]
+            .allSatisfy { fm.isExecutableFile(atPath: $0.path) })
+        let folder = fm.temporaryDirectory.appending(path: "ripple-real-dvd-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: folder) }
+        var made: [URL] = []
+        for (name, size) in [("Beach Day.mov", "640x360"), ("Old Tape.mov", "480x360")] {
+            let url = folder.appending(path: name)
+            let args = ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=duration=12:size=\(size):rate=30", "-f", "lavfi", "-i", "sine=frequency=440:duration=12",
+                        "-c:v", "mpeg4", "-c:a", "aac", url.path]
+            if let result = try? await ProcessRunner.run(ffmpeg, args), result.status == 0 { made.append(url) }
+        }
+        check("two real .mov files were made", made.count == 2)
+        burn.showSnapshot(.videoEmpty)
+        dvd.showSnapshot(.empty)
+        await dvd.add(made)
+        let ready = dvd.items.compactMap { item -> (VideoFile, Bool)? in if case .ready(let file) = item.state { (file, item.picture != nil) } else { nil } }
+        check("the app reads both videos", ready.count == 2, "\(dvd.items.map(\.state))")
+        check("each video has a real picture from its own frames", ready.allSatisfy(\.1))
+        check("the titles come from the file names", ready.map(\.0.title) == ["Beach Day", "Old Tape"], "\(ready.map(\.0.title))")
+        check("the lengths and shapes are right", ready.allSatisfy { abs($0.0.seconds - 12) < 0.5 } && ready[0].0.isWidescreen && !ready[1].0.isWidescreen)
+        dvd.makeMaker = { project, work in DVDBuilder(tools: VideoSources.tools, project: project, work: work) }
+        check("the disc can be built", dvd.canBuild(on: burn.deviceState))
+        dvd.build(on: burn.deviceState)
+        await wait(until: { !dvd.isBuilding }, seconds: 180)
+        guard case .ready(let result) = dvd.phase else { return check("the real build finished", false, "\(dvd.phase)") }
+        let size = (try? result.image.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        check("the real build made a disc image", size > 1_000_000 && result.titles == 2, "\(size) bytes, \(result.titles) titles")
+        let mount = folder.appending(path: "mount")
+        try? fm.createDirectory(at: mount, withIntermediateDirectories: true)
+        let attach = try? await ProcessRunner.run(URL(fileURLWithPath: "/usr/bin/hdiutil"), ["attach", "-readonly", "-nobrowse", "-mountpoint", mount.path, result.image.path])
+        check("the image mounts", attach?.status == 0)
+        let video = (try? fm.contentsOfDirectory(atPath: mount.appending(path: "VIDEO_TS").path)) ?? []
+        check("it holds a VIDEO_TS folder with the disc's files", video.contains("VIDEO_TS.IFO") && video.contains { $0.hasSuffix(".VOB") }, "\(video)")
+        check("it holds an AUDIO_TS folder", fm.fileExists(atPath: mount.appending(path: "AUDIO_TS").path))
+        _ = try? await ProcessRunner.run(URL(fileURLWithPath: "/usr/bin/hdiutil"), ["detach", mount.path, "-force"])
+        dvd.startOver()
+        check("Start Over removes the work folder", !fm.fileExists(atPath: result.work.path))
+    }
 }

@@ -11,8 +11,11 @@ protocol VideoSource: Sendable {
 }
 
 enum VideoSources {
+    /// Test and snapshot runs use made-up videos and a stand-in builder, unless RIPPLE_REAL_DVD=1 asks for the real programs.
+    static var useFixtures: Bool { Store.isOverridden && ProcessInfo.processInfo.environment["RIPPLE_REAL_DVD"] != "1" }
+
     static func make() -> any VideoSource {
-        if Store.isOverridden { return FixtureVideoSource() }
+        if useFixtures { return FixtureVideoSource() }
         return LiveVideoSource(ffmpeg: ffmpeg)
     }
 

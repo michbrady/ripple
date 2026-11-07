@@ -59,7 +59,7 @@ Before `swift build` or `swift test`, run `tools/build-lame.sh` once. `./build.s
 
 ## Checks
 
-`swift test` (RippleKit), `tools/selftest.sh` (the app's own functions on a fixture disc), `tools/snap.sh` (every page, light and dark), `tools/grid-lint.sh`.
+`swift test` (RippleKit), `tools/selftest.sh` (the app's own functions on a fixture disc), `tools/selftest-dvd.sh` (the app's own copies of ffmpeg, dvdauthor, and spumux build a real Video DVD image), `tools/snap.sh` (every page, light and dark), `tools/grid-lint.sh`.
 `RIPPLE_LIVE=1 swift test --filter LiveLookup` runs one test against the real MusicBrainz and cover services.
 `RIPPLE_REAL_DRIVE=1` adds a read-only check of the real burner's status to the self-test.
 Real-disc checks are manual: see the stories marked `doing` in `docs/STORIES.md`.

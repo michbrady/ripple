@@ -36,6 +36,15 @@ enum SelfTest {
             }
             return
         }
+        // The real ffmpeg, spumux, dvdauthor, and hdiutil inside the app, on videos made here. Writes nothing to a drive.
+        if ProcessInfo.processInfo.environment["RIPPLE_REAL_DVD"] == "1" {
+            Task {
+                await realDVDChecks(burn: burn, dvd: dvd)
+                print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
+                finish(code: failures == 0 ? 0 : 1)
+            }
+            return
+        }
         Task {
             try? await Task.sleep(for: .seconds(0.5))
             let fm = FileManager.default

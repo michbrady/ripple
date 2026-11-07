@@ -688,7 +688,7 @@ Acceptance:
 - [self] The About window and the web page credit ffmpeg and dvdauthor, give their licences, and say where to get the source.
 - [manual] `tools/release.sh` notarizes with the tools inside.
 Status: doing
-Note: `tools/build-dvdauthor.sh` builds dvdauthor and spumux without libdvdcss (no libdvdread, no dvdunauthor) with libpng, FreeType, and Brotli copied next to them. `./build.sh` puts ffmpeg, dvdauthor, spumux, their libraries, the GPL 3 text, dvdauthor's licence, and a notice in the app, and signs each before the app (hardened runtime and timestamp when signing with Developer ID). The signed app runs all three. The web page and privacy page credit them. Still to do: the credits in the About window, a written decision on how source is offered (GPL), and a notarized release.
+Note: `tools/build-dvdauthor.sh` builds dvdauthor and spumux without libdvdcss (no libdvdread, no dvdunauthor) with libpng, FreeType, and Brotli copied next to them. `./build.sh` puts ffmpeg, dvdauthor, spumux, their libraries, the GPL 3 text, dvdauthor's licence, and a notice in the app, and signs each before the app (hardened runtime and timestamp when signing with Developer ID). The signed app runs all three. The web page and privacy page credit them. Still to do: the credits in the About window, a written decision on how source is offered (GPL), and a notarized release. `tools/selftest-dvd.sh` runs the installed, signed app's own copies of all three tools on two videos it makes: it reads them with real pictures, builds a real disc image, mounts it, and finds VIDEO_TS and AUDIO_TS (12 checks, all pass).
 
 ## Dropped
 - Accounts, sync, sharing, and teams: Ripple has one user and no server.
