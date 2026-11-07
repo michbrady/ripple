@@ -6,4 +6,7 @@ enum AppLinks {
     static let privacy = URL(string: "https://www.bradysbit.com/ripple/privacy.html")!
     /// Opened in the browser only when someone chooses it. The app never asks for a tip on its own.
     static let tip = URL(string: "https://ko-fi.com/bradysbit")!
+    /// The programs that make a Video DVD, credited in the About window.
+    static let ffmpeg = URL(string: "https://ffmpeg.org/")!
+    static let dvdauthor = URL(string: "https://dvdauthor.sourceforge.net/")!
 }

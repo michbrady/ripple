@@ -136,9 +136,16 @@ enum AboutPanel {
         credits.append(NSAttributedString(string: """
             MP3 encoding by LAME 3.100, used under the GNU LGPL (lame.sourceforge.io), as a separate library you can replace. \
             The licence and source notice are in the app's Resources/Licenses folder. \
+            Video DVDs are made with FFmpeg (ffmpeg.org) and dvdauthor and spumux (dvdauthor.sourceforge.net), \
+            used under the GNU General Public License as separate programs inside the app. \
+            Their licences, version numbers, and where to get their source are in the same folder. \
             Album details from MusicBrainz. Cover pictures from the Cover Art Archive and the iTunes Search API.
             """, attributes: body))
         credits.append(NSAttributedString(string: "\n\n", attributes: body))
+        for (name, link) in [("FFmpeg", AppLinks.ffmpeg), ("dvdauthor", AppLinks.dvdauthor)] {
+            credits.append(NSAttributedString(string: name, attributes: [.font: NSFont.systemFont(ofSize: 11), .link: link]))
+            credits.append(NSAttributedString(string: "  \u{00B7}  ", attributes: body))
+        }
         credits.append(NSAttributedString(string: "www.bradysbit.com/ripple", attributes: [
             .font: NSFont.systemFont(ofSize: 11), .link: AppLinks.website,
         ]))
