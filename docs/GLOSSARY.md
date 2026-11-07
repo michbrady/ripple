@@ -33,4 +33,9 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | Chapter | A point inside a title that the player's Next button jumps to | scene, marker |
 | TV Standard | NTSC (US) or PAL (Europe): how many lines and frames a second the disc is made for | region, format |
 | Disc Image | A single .iso file that holds a whole Video DVD, for later burning or for a DVD player app | ISO, backup |
-
+| Build | Make the Disc Image from the titles and menu: convert, draw the menu, write the disc files. Does not burn | make, render, encode, create |
+| Menu Look | One of four looks for the Menu: Classic, Midnight, Daylight, Warm. Shown as "Look" in the Menu inspector | theme, style, template |
+| Background | The picture behind the Menu's buttons | wallpaper, cover (a Cover is an album's picture) |
+| Menu Music | A sound file that plays under the Menu | soundtrack, audio |
+| Scenes | A page of chapter pictures for one Title; its button is on the Menu | chapters page, scene selection |
+| Disc Name | The name shown at the top of the Menu and as the disc's volume name | label, volume name |

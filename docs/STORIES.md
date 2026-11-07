@@ -449,7 +449,7 @@ Status: done
 Note: Ripple is free. The web page carries a Ko-fi tip link and a privacy and terms page that says what the app sends (a disc lookup to MusicBrainz, the Cover Art Archive, and Apple's iTunes Search) and what it keeps (nothing but settings on the Mac). The Help menu and About window also link to the Ko-fi tip page; the app never asks for a tip on its own. The privacy page's contact is BradysBit's Ko-fi page.
 
 ## M7 Video DVD
-Ends with an app that turns a handful of video files into a DVD with a menu and burns it. Design, risks, and what cannot be checked here: `docs/DVD-DESIGN.md`. Each story still needs its `UX:` block before it is built.
+Ends with an app that turns a handful of video files into a DVD with a menu and burns it. Design, risks, and what cannot be checked here: `docs/DVD-DESIGN.md`. Each story has a `UX:` block (2026-11-07). The window is one `DVDView` with its own `DVDModel` (see `docs/DVD-DESIGN.md`, Screen and model).
 
 ### S-039 Choose Video DVD
 As the user, I pick Video DVD as the kind of disc to burn, next to Audio CD and MP3 Disc.
@@ -457,8 +457,14 @@ Screens: 11-dvd-empty
 Depends: S-031
 Acceptance:
 - [unit] `DiscType` has a third case, Video DVD, with a title and a one-line summary.
-- [snap] 11-dvd-empty shows the switch with three choices and an empty list that says "Drop video files here, or choose a folder."
+- [snap] 11-dvd-empty shows the switch with three choices and an empty list that says "Drop video files here, or choose them."
 - [self] The choice is remembered, and the window asks for a blank DVD-R or DVD-RW, not a CD.
+UX:
+- Flow: Burn mode, Disc Type switch (Audio CD, MP3 Disc, Video DVD) -> empty list with "Choose Videos…" -> drop or choose -> the list (S-040)
+- Surface: the existing Disc Type switch in Burn mode; the page below it is `DVDView`, driven by its own `DVDModel` (the model owns videos, menu choices, and the build; it reads the drive and does the burn through `BurnModel`'s device state). Table row: a place people come back to
+- States: empty "Add Videos for the Disc" / "Drop video files here, or choose them." / button "Choose Videos…"; no blank DVD says "Insert a blank DVD-R or DVD-RW." in the bar, never a CD
+- Words: switch label "Video DVD"; summary "Plays in any DVD player, with a menu. Holds about 2 hours of video."
+- Access: the switch is reachable by keyboard like the other two; the empty page's default button has focus; VoiceOver reads "Video DVD, disc type"
 Status: todo
 
 ### S-040 Add video files
@@ -470,6 +476,12 @@ Acceptance:
 - [unit] ffmpeg's report of a file becomes length, size, frame rate, picture size, and whether it has audio.
 - [self] A file that cannot be read says so on its row. A copy-protected file says "This video is copy-protected, so Ripple cannot read it."
 - [snap] 11-dvd-list shows rows with a picture from the video, a title, the length, and a state.
+UX:
+- Flow: drop files or folders, or "Choose Videos…" (⌘O) or toolbar + -> rows appear with "Reading…" -> each shows picture, title, length, size -> the bar updates
+- Surface: inline rows in the list (a place people come back to); problems sit on the row, not in an alert
+- States: reading "Reading…" with a small spinner; unreadable "Ripple cannot read this video." with the reason; copy-protected "This video is copy-protected, so Ripple cannot read it."; skipped files "3 files were skipped because they are not videos." under the list; too many "A DVD holds 99 videos at most."
+- Words: "Choose Videos…", tooltip on + "Add videos to the disc (⌘O)"; row length "1:42:10", size "1.2 GB"
+- Access: rows are focusable; VoiceOver reads "Summer Trip, 1 hour 42 minutes, 1.2 gigabytes"; a problem is an icon and words, not only color
 Status: doing
 Note: The reader (length, size, rate, shape, sound, copy-protection) is built and tested on real .mov, .mp4, .avi, .mkv, .wmv, and .mpg files. The window is not built yet.
 
@@ -480,6 +492,12 @@ Depends: S-040
 Acceptance:
 - [unit] A title's name starts as the file's name without its ending and underscores, and is made safe for the menu (length cut, no line breaks).
 - [self] Move Up, Move Down, drag to reorder, rename, remove, and Undo all work.
+UX:
+- Flow: select a row -> drag to reorder, or Move Up / Move Down (⌥⌘↑ / ⌥⌘↓); double-click the title or Return renames; Delete removes -> ⌘Z undoes each
+- Surface: inline (changes one value on something on screen); the same actions are in the context menu
+- States: a long title truncates in the row and shows in full in the tooltip; a title cut for the menu shows "Shown on the menu as “…”" under the field while it is being edited
+- Words: "Move Up", "Move Down", "Rename", "Remove", "Undo Remove Video"
+- Access: every action works from the keyboard; the context menu has all of them; VoiceOver announces "Moved to position 2 of 5"
 Status: doing
 Note: Names are cleaned and cut (tested). The list and its controls are not built yet.
 
@@ -491,6 +509,12 @@ Acceptance:
 - [unit] The plan gives each title the same bit rate from what is left after audio and menus, capped at 9,000 kbit/s; the bands are Excellent, Good, Reduced, and Too long.
 - [unit] A dual-layer disc in the drive raises the capacity.
 - [snap] The bar shows used space and the quality word. Too long shows what to remove, in minutes.
+UX:
+- Flow: the bar updates after every add, remove, and reorder; hover or focus shows the numbers
+- Surface: inline, in the bottom bar (information that needs no action goes inline)
+- States: fits "1 h 42 min of 1 h 50 min · Excellent"; reduced "Reduced quality: the picture is softer to fit everything"; too long (red, with an icon) "Too long by 24 min. Remove a video or use a dual-layer disc."; no disc in the bar still shows the single-layer size and says "Based on a single-layer DVD."
+- Words: quality words Excellent, Good, Reduced; "Too long"; no "bitrate" anywhere
+- Access: the bar is one accessibility element: "Disc 92 percent full, quality Good"; Too long is an icon and words
 Status: doing
 Note: The plan (bit rate, quality bands, fit, dual layer) is built and tested. The bar in the window is not built yet.
 
@@ -502,6 +526,12 @@ Acceptance:
 - [unit] 25 and 50 frames a second suggest PAL; 23.976, 24, 29.97, and 30 suggest NTSC. Mixed videos use the first one and say so.
 - [unit] A 16:9 source stays 16:9; a 4:3 source gets bars at the sides; other shapes get bars on the sides or the top to fit without stretching.
 - [self] A choice in the window overrides the suggestion.
+UX:
+- Flow: the standard is guessed from the videos and shown in the bottom bar as a pop-up "TV Standard: NTSC"; the user changes it there. Screen shape is per video, in the row's context menu: "Widescreen (16:9)" or "Standard (4:3)"
+- Surface: inline pop-up and context menu (changes one value on screen)
+- States: mixed videos show "Videos use different standards. Ripple used NTSC, from the first one."
+- Words: "NTSC (US)", "PAL (Europe)", "TV Standard"
+- Access: the pop-up is a labelled control; VoiceOver "TV Standard, NTSC (US)"
 Status: doing
 Note: NTSC or PAL from the frame rate, and the 4:3 or 16:9 fit with bars, are built and tested, and a real ffmpeg conversion was read back. The choices in the window are not built yet.
 
@@ -514,6 +544,12 @@ Acceptance:
 - [self] The menu pictures are drawn at 720x480 (NTSC) or 720x576 (PAL) and the highlight pictures use only four colors.
 - [snap] 11-dvd-menu shows the first menu page as the disc will show it.
 - [manual] A DVD player shows the menu, moves between buttons with the arrow keys, and plays the chosen title.
+UX:
+- Flow: the menu is made for you; open the Menu inspector (toolbar button, ⌥⌘M) to see it -> it shows page 1 of the menu as the disc will
+- Surface: inspector on the right of the list (shows details while people keep working); it has the pages on top and the Menu Look, Background, and Menu Music controls under them (S-049, S-050, S-052)
+- States: with no videos "Add videos to see the menu."; more than 6 videos shows page dots and "Page 1 of 2"
+- Words: toolbar button "Menu", tooltip "Show the menu preview and choices (⌥⌘M)"; the disc name field is above the list: "Disc Name"
+- Access: the inspector toggles from the keyboard; the preview image has the label "Menu page 1 of 2: Summer Trip, 6 videos"
 Status: doing
 Note: Layout, drawing, button links, and the four-color overlay rules are built and tested (DVDMenuTests). A real spumux run and a player check wait for dvdauthor.
 
@@ -524,6 +560,12 @@ Depends: S-044
 Acceptance:
 - [unit] Each look has a background, a text color, and a highlight color; the text keeps a contrast of at least 7 to 1 against its background.
 - [snap] 11-dvd-menu shows each look.
+UX:
+- Flow: in the Menu inspector, "Look" pop-up -> Classic, Midnight, Daylight, Warm -> the preview changes at once
+- Surface: inline pop-up in the inspector
+- States: none beyond the preview
+- Words: "Look", the four names
+- Access: labelled pop-up; the preview label includes the look
 Status: doing
 Note: The four looks are built, and each keeps text at 7 to 1 or better (tested).
 
@@ -535,6 +577,12 @@ Acceptance:
 - [unit] A picture is cropped to fill the menu and darkened so white text keeps a contrast of at least 7 to 1.
 - [unit] The music is cut to 90 seconds at most; a shorter file is used whole; the menu's length matches it.
 - [self] A picture or sound file that cannot be read is named and the built-in background and silence are used instead.
+UX:
+- Flow: in the Menu inspector, "Choose Picture…" and "Choose Music…" -> a file chooser -> the name shows with "Remove" -> the preview updates
+- Surface: inline buttons that open the system file chooser
+- States: unreadable "Ripple cannot read “name”. The built-in background is used."; a music file over 90 seconds shows "Plays the first 1:30, then repeats."; none chosen shows "Built-in background" and "No music"
+- Words: "Background", "Music", "Choose Picture…", "Choose Music…", "Remove"
+- Access: both buttons are in the tab order; the chosen file name is read after the label
 Status: doing
 Note: Background picture (cropped and covered, 7 to 1 worst case, tested) and music (length 5 to 90 seconds, tested with a stand-in) are in the pipeline. The choosers in the window are not built yet.
 
@@ -547,6 +595,12 @@ Acceptance:
 - [unit] A scene page holds 6 chapters; more get Next and Previous.
 - [self] The dvdauthor description jumps to the right chapter of the right title from each picture.
 - [manual] A DVD player plays from the chosen chapter and returns to the scene page.
+UX:
+- Flow: a title over 10 minutes gets a "Scenes" button beside it on the menu; in the preview the scene pages follow the main pages
+- Surface: the Menu inspector preview (pages) only; nothing new to configure
+- States: titles under 10 minutes have no Scenes button and the preview says nothing
+- Words: the menu button reads "Scenes"; the player's chapter button is the player's own
+- Access: none beyond S-052
 Status: todo
 
 ### S-052 Preview the menu
@@ -556,6 +610,12 @@ Depends: S-044
 Acceptance:
 - [snap] 11-dvd-preview shows the pages with their buttons, and updates when I rename a title, change the look, or choose a picture.
 - [self] Opening the preview converts nothing.
+UX:
+- Flow: the Menu inspector shows every page; arrows or the page dots move between them; renames, Look, Background change it at once
+- Surface: the Menu inspector from S-044 (no new window)
+- States: while redrawing, keep the old page; no spinner under half a second
+- Words: "Page 2 of 3"; tooltips "Show the next menu page" and "Show the previous menu page"
+- Access: ← and → move between pages when the preview has focus
 Status: todo
 
 ### S-045 Build the disc
@@ -568,6 +628,12 @@ Acceptance:
 - [self] With stand-in tools, every step runs in order, reports progress, and Cancel stops the running program and removes the work folder.
 - [self] Not enough free space for the work folder is said before anything starts.
 - [self] A short real test video makes a VIDEO_TS folder that dvdauthor's own reader reads back with the right number of titles and chapters.
+UX:
+- Flow: "Build Disc" (⌘B) in the bottom bar -> a check of space and tools before anything starts -> the page changes to a progress page with the stage in words, one bar, and Cancel (Escape) -> the finished disc page (S-046)
+- Surface: the page itself changes, like burning does (a long task people leave running; a sheet would block the window for 30 minutes). The sidebar and Disc Type switch stay but are disabled
+- States: stages say "Checking the videos…", "Drawing the menu…", "Converting “Summer Trip” (2 of 5)…", "Writing the disc files…", "Making the disc image…"; time left shows only after the first minute, as "About 25 minutes left"; failure shows the `DVDBuildError` text with "Try Again" and "Back to Videos", which keeps the list; cancel returns to the list with nothing lost
+- Words: "Build Disc", "Cancel"; failure title "Unable to Build the Disc"
+- Access: the bar is a labelled progress indicator that reads the stage; Cancel is the Escape key and a button; the window does not sleep the Mac while building
 Status: doing
 Note: The whole pipeline runs against stand-in tools in the right order, with progress, a named failure, cancel with clean-up, and the real disc image mounted and read back (DVDBuilderTests). dvdauthor itself is not built yet, so a real disc has not been made.
 
@@ -578,6 +644,12 @@ Depends: S-045
 Acceptance:
 - [self] The image mounts with VIDEO_TS and AUDIO_TS in it, and the volume name is the disc's name.
 - [self] Save Disc Image needs no drive and no blank disc.
+UX:
+- Flow: the build ends -> page "Disc Ready" with "Burn Disc" (default) and "Save Disc Image…" -> Save Disc Image opens the save panel, named after the disc -> the image is saved and the page offers "Show in Finder" and "Burn Disc"
+- Surface: the page (a place the flow ends); the save panel is the system's
+- States: ready "Your Video DVD is ready: 5 videos, 1 h 42 min."; no blank disc in the drive: "Burn Disc" is disabled with "Insert a blank DVD-R or DVD-RW to burn." and Save Disc Image still works; leaving with an unburned, unsaved disc asks "Discard the Finished Disc?" ("Discard" and "Keep Disc"); the same question on Quit
+- Words: "Disc Ready", "Burn Disc", "Save Disc Image…", "Show in Finder", "Start Over"
+- Access: both buttons are in the tab order; VoiceOver reads the summary line first
 Status: doing
 Note: The image step runs for real (hdiutil, UDF 1.02) inside the pipeline test. Saving it from the window is not built yet.
 
@@ -589,6 +661,12 @@ Acceptance:
 - [unit] `DiscBurner` has a method that burns an image file; the fixture burner records it.
 - [self] A disc that is too small, not blank, or a CD is refused with the usual messages; Cancel stops the burn.
 - [manual] The disc burns, verifies, ejects, and plays in a DVD player with the menu working.
+UX:
+- Flow: "Burn Disc" -> the burning page already used by Audio CD and MP3 Disc (stage, bar, Cancel) -> verify -> eject -> "Disc Ready" with "Burn Another Disc"
+- Surface: the existing `BurningView`; no new screen
+- States: the usual messages from `BurnModel` (too small, not blank, a CD in the drive); the work folder is removed after a good burn
+- Words: unchanged: "Unable to Burn the Disc", "Try Again"
+- Access: as burning today
 Status: todo
 
 ### S-048 Carry the tools

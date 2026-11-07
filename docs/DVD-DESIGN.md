@@ -69,6 +69,13 @@ The two free programs that Ripple compares to (Burn, DVDStyler) and DVD Flick al
 ### What waits
 - Moving menus (a video loop behind the buttons), your own button shapes, and a template designer. They are the largest part of the other programs' work and the part most likely to go wrong on a real player.
 
+## Screen and model (UX pass, 2026-11-07)
+
+- **Where it lives.** Video DVD is the third Disc Type in Burn mode (S-039). Choosing it shows `DVDView`, driven by a `DVDModel` in `Sources/Ripple/DVD/`. `DVDModel` owns the videos, the Disc Name, TV Standard, Menu choices, and the build (through `any DVDMaker`). The burn step and the drive state stay in `BurnModel`, so the three disc types share one drive and one set of burn messages. `DVDModel` conforms to `StoppableJob`.
+- **Pages.** Videos (list, bottom bar with the capacity bar, TV Standard, Build Disc, and a Menu inspector on the right) -> Building (stage, bar, Cancel) -> Disc Ready (Burn Disc, Save Disc Image…) -> the existing burning page.
+- **Quitting** while building, burning, or with a finished disc that is neither burned nor saved asks first. Cancel while building leaves the list as it was.
+- **Tests and snapshots** use `FixtureDVDMaker`, so no page needs ffmpeg or a drive.
+
 ## What cannot be promised
 
 - **Copy-protected video** (movies bought or rented from stores, streaming downloads) cannot be read. Ripple says so and does not try to get around it.
