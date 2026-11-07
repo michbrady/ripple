@@ -1,3 +1,4 @@
+import AppKit
 import RippleKit
 import SwiftUI
 
@@ -33,6 +34,7 @@ struct DVDView: View {
                 } actions: {
                     Button("Back to Videos") { dvd.startOver() }.keyboardShortcut(.defaultAction)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -334,18 +336,41 @@ struct DVDBuilding: View {
     }
 }
 
-/// The disc is made. Saving the image and burning come next (S-046, S-047).
+/// The disc is made: burn it, or save it as an image.
 struct DVDReady: View {
     @Environment(DVDModel.self) private var dvd
+    @State private var confirmingDiscard = false
     let result: DVDBuildResult
 
     var body: some View {
         ContentUnavailableView {
             Label("Disc Ready", systemImage: "checkmark.circle")
         } description: {
-            Text("Your Video DVD is ready: \(result.titles) \(result.titles == 1 ? "video" : "videos").")
+            VStack(spacing: Space.xs) {
+                Text("Your Video DVD is ready: \(result.titles) \(result.titles == 1 ? "video" : "videos"), \(DVDPlan.approximateText(dvd.totalSeconds)).")
+                if let saved = dvd.savedImage {
+                    Label("Saved as \(saved.lastPathComponent).", systemImage: "checkmark").foregroundStyle(.secondary)
+                }
+            }
         } actions: {
-            Button("Start Over") { dvd.startOver() }
+            HStack {
+                Button("Save Disc Image\u{2026}") { dvd.chooseImageDestination() }
+                    .help("Save the disc as an .iso file to open in a DVD player app or burn later")
+                if let saved = dvd.savedImage {
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([saved]) }
+                }
+                Button("Start Over") {
+                    if dvd.hasUnsavedDisc { confirmingDiscard = true } else { dvd.startOver() }
+                }
+            }
+            .fixedSize()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .confirmationDialog("Discard the Finished Disc?", isPresented: $confirmingDiscard) {
+            Button("Discard", role: .destructive) { dvd.startOver() }
+            Button("Keep Disc", role: .cancel) {}
+        } message: {
+            Text("The disc has not been burned or saved. If you start over, it is lost.")
         }
     }
 }

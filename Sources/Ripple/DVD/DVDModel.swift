@@ -38,6 +38,10 @@ final class DVDModel: StoppableJob {
 
     private(set) var phase: Phase = .editing
     private(set) var buildStarted: Date?
+    /// Where the finished disc image was saved, once it has been.
+    private(set) var savedImage: URL?
+    /// Set when the finished disc was burned (S-047).
+    private(set) var isBurned = false
 
     @ObservationIgnored private let source: any VideoSource
     @ObservationIgnored private var buildTask: Task<Void, Never>?
@@ -106,15 +110,24 @@ final class DVDModel: StoppableJob {
 
     var isBuilding: Bool { if case .building = phase { true } else { false } }
 
-    var isBusy: Bool { isBuilding }
+    /// A finished disc that was neither burned nor saved: leaving would lose it.
+    var hasUnsavedDisc: Bool {
+        guard case .ready = phase else { return false }
+        return savedImage == nil && !isBurned
+    }
+
+    var isBusy: Bool { isBuilding || hasUnsavedDisc }
 
     var stopPrompt: (title: String, detail: String, stop: String, keep: String) {
-        ("Stop Making the Disc?", "The disc is not finished. If you quit now, the work so far is lost.", "Stop and Quit", "Keep Working")
+        isBuilding
+            ? ("Stop Making the Disc?", "The disc is not finished. If you quit now, the work so far is lost.", "Stop and Quit", "Keep Working")
+            : ("Discard the Finished Disc?", "The disc has not been burned or saved. If you quit now, it is lost.", "Discard and Quit", "Keep Disc")
     }
 
     func stop() async {
         buildTask?.cancel()
         await buildTask?.value
+        startOver()
     }
 
     // MARK: Build
@@ -136,6 +149,8 @@ final class DVDModel: StoppableJob {
         let work = FileManager.default.temporaryDirectory.appending(path: "ripple-dvd-\(UUID().uuidString)", directoryHint: .isDirectory)
         let maker = makeMaker(project(on: state), work)
         buildStarted = .now
+        savedImage = nil
+        isBurned = false
         phase = .building(.checking, 0)
         buildTask = Task { [weak self] in
             do {
@@ -158,9 +173,39 @@ final class DVDModel: StoppableJob {
 
     func cancelBuild() { buildTask?.cancel() }
 
+    /// Asks where to put the .iso, then saves it.
+    func chooseImageDestination() {
+        guard case .ready = phase else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "iso") ?? .data]
+        panel.nameFieldStringValue = "\(cleanDiscName).iso"
+        panel.message = "Save the disc as an image you can open in a DVD player app or burn later"
+        panel.prompt = "Save"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        saveImage(to: url)
+    }
+
+    /// Copies the finished image to `url`, replacing a file that is there. Needs no drive and no blank disc.
+    @discardableResult
+    func saveImage(to url: URL) -> Bool {
+        guard case .ready(let result) = phase else { return false }
+        let fm = FileManager.default
+        do {
+            if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
+            try fm.copyItem(at: result.image, to: url)
+            savedImage = url
+            return true
+        } catch {
+            phase = .failed("The disc image could not be saved. \(error.localizedDescription)")
+            return false
+        }
+    }
+
     /// Back to the list, from a failure or a finished disc. Removes what the build made.
     func startOver() {
         if case .ready(let result) = phase { try? FileManager.default.removeItem(at: result.work) }
+        savedImage = nil
+        isBurned = false
         phase = .editing
     }
 
@@ -357,7 +402,7 @@ final class DVDModel: StoppableJob {
         buildStarted = nil
         showsMenu = page == .videoMenu || page == .videoMenuDaylight
         look = page == .videoMenuDaylight ? .daylight : .classic
-        guard page == .videoList || page == .videoOver || page == .videoMenu || page == .videoMenuDaylight || page == .videoBuilding || page == .videoFailed else { return }
+        guard page == .videoList || page == .videoOver || page == .videoMenu || page == .videoMenuDaylight || page == .videoBuilding || page == .videoFailed || page == .videoDone else { return }
         func video(_ name: String, _ seconds: Double) -> DVDItem {
             let url = URL(fileURLWithPath: "/Movies/\(name).mp4")
             let file = VideoFile(url: url, title: VideoProbe.defaultTitle(for: url), bytes: Int(seconds * 450_000), seconds: seconds,
@@ -365,6 +410,11 @@ final class DVDModel: StoppableJob {
             return DVDItem(url: url, state: .ready(file), picture: FixtureVideoSource.gradient(seed: abs(name.hashValue)))
         }
         items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142)]
+        if page == .videoDone {
+            items = Array(items.prefix(4))
+            phase = .ready(DVDBuildResult(image: URL(fileURLWithPath: "/tmp/disc.iso"), work: URL(fileURLWithPath: "/tmp/ripple-dvd-snapshot"), titles: 4))
+            return
+        }
         if page == .videoBuilding || page == .videoFailed {
             items = Array(items.prefix(4))
             let name = items.count > 1 ? (title(of: items[1].id) ?? "Birthday Party") : "Birthday Party"

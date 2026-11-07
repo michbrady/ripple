@@ -652,8 +652,8 @@ UX:
 - States: ready "Your Video DVD is ready: 5 videos, 1 h 42 min."; no blank disc in the drive: "Burn Disc" is disabled with "Insert a blank DVD-R or DVD-RW to burn." and Save Disc Image still works; leaving with an unburned, unsaved disc asks "Discard the Finished Disc?" ("Discard" and "Keep Disc"); the same question on Quit
 - Words: "Disc Ready", "Burn Disc", "Save Disc Image…", "Show in Finder", "Start Over"
 - Access: both buttons are in the tab order; VoiceOver reads the summary line first
-Status: doing
-Note: The image step runs for real (hdiutil, UDF 1.02) inside the pipeline test. Saving it from the window is not built yet.
+Status: done
+Note: After a build the Disc Ready page offers Save Disc Image… (a save panel named after the disc), Show in Finder once saved, and Start Over, which asks "Discard the Finished Disc?" when the disc is neither saved nor burned. Quitting asks the same. Saving needs no drive. Snapshot page: `burn-videoDone`. The image's contents (VIDEO_TS, AUDIO_TS, volume name) are covered by the DVDBuilder pipeline test, which mounts a real image.
 
 ### S-047 Burn the Video DVD
 As the user, I put in a blank DVD-R or DVD-RW and burn the disc.

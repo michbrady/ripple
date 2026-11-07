@@ -71,6 +71,8 @@ public struct DVDBuildResult: Equatable, Sendable {
     /// Every file the build made. Delete it when the image is burned or copied away.
     public var work: URL
     public var titles: Int
+
+    public init(image: URL, work: URL, titles: Int) { self.image = image; self.work = work; self.titles = titles }
 }
 
 /// Turns a `DVDProject` into a disc image: pictures, menus, converted videos, the disc's files, and the image.

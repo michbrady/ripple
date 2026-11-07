@@ -231,6 +231,22 @@ extension SelfTest {
         dvd.startOver()
         check("Start Over removes the work folder", image.map { !fm.fileExists(atPath: $0.deletingLastPathComponent().path) } == true && !dvd.isBusy)
 
+        // S-046: a finished disc can be saved as an image with no drive; leaving it unsaved is guarded.
+        dvd.makeMaker = { project, work in FixtureDVDMaker(project: project, work: work, stepDelay: .milliseconds(2)) }
+        dvd.build(on: state)
+        await wait(until: { if case .ready = dvd.phase { true } else { false } })
+        check("a finished disc that is not saved guards against quitting", dvd.hasUnsavedDisc && dvd.isBusy && dvd.stopPrompt.title == "Discard the Finished Disc?")
+        burn.showSnapshot(.noDisc)
+        let target = fm.temporaryDirectory.appending(path: "ripple-saved-\(UUID().uuidString).iso")
+        check("the image saves with no disc in the drive", dvd.saveImage(to: target) && fm.fileExists(atPath: target.path))
+        check("a saved disc no longer guards against quitting", !dvd.hasUnsavedDisc && !dvd.isBusy && dvd.savedImage == target)
+        check("saving over an existing file replaces it", dvd.saveImage(to: target))
+        try? fm.removeItem(at: target)
+        dvd.startOver()
+        burn.showSnapshot(.videoEmpty)
+        dvd.showSnapshot(.videoList)
+        dvd.remove(ids: Set(dvd.items.filter { if case .ready = $0.state { false } else { true } }.map(\.id)))
+
         dvd.makeMaker = { project, work in FixtureDVDMaker(project: project, work: work, stepDelay: .milliseconds(300)) }
         dvd.build(on: state)
         await wait(until: { if case .building(.converting, _) = dvd.phase { true } else { false } })
