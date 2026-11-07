@@ -42,6 +42,11 @@ cp "$bin" "$app/Contents/MacOS/$name"
 mkdir -p "$app/Contents/Frameworks" "$app/Contents/Resources/Licenses"
 cp "$here/.lame/libmp3lame.0.dylib" "$app/Contents/Frameworks/"
 cp "$here/vendor/lame/LICENSE-LAME.txt" "$here/vendor/lame/LAME-NOTICE.txt" "$app/Contents/Resources/Licenses/"
+# ffmpeg, the program that reads videos, goes in as its own file when tools/fetch-ffmpeg.sh has fetched it (S-048 adds the rest of the DVD tools and the credits).
+if [[ -x "$here/.dvdtools/ffmpeg" ]]; then
+  mkdir -p "$app/Contents/Resources/bin"
+  cp "$here/.dvdtools/ffmpeg" "$app/Contents/Resources/bin/ffmpeg"
+fi
 # The build links a path on this Mac so `swift run` works; a finished app must not carry it.
 install_name_tool -delete_rpath "$here/.lame" "$app/Contents/MacOS/$name" 2>/dev/null || true
 sed -e "s/__BUILD__/$(date +%Y%m%d%H%M)/" "$here/Info.plist.in" > "$app/Contents/Info.plist"
@@ -61,6 +66,7 @@ if [[ "$identity" == Developer\ ID* || "${HARDENED:-}" == 1 ]]; then flags=(--op
 [[ "$identity" == "-" ]] && flags=(${flags:#--timestamp})   # an ad hoc signature cannot be timestamped
 # Sign the library first, then the app that holds it.
 codesign --force "${flags[@]}" --sign "$identity" "$app/Contents/Frameworks/libmp3lame.0.dylib" 2>&1 | grep -v "replacing existing signature" || true
+[[ -f "$app/Contents/Resources/bin/ffmpeg" ]] && { codesign --force "${flags[@]}" --sign "$identity" "$app/Contents/Resources/bin/ffmpeg" 2>&1 | grep -v "replacing existing signature" || true; }
 ents=()
 [[ -n "${ENTITLEMENTS:-}" ]] && ents=(--entitlements "$ENTITLEMENTS")   # see tools/fallback.entitlements
 codesign --force "${flags[@]}" "${ents[@]}" --sign "$identity" "$app" 2>&1 | grep -v "replacing existing signature" || true
