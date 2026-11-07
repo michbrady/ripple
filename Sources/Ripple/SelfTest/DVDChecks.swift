@@ -19,6 +19,7 @@ extension SelfTest {
         await videoListChecks(dvd: dvd)
         fitChecks(burn: burn, dvd: dvd)
         await standardChecks()
+        menuChecks(dvd: dvd)
     }
 
     /// S-040: dropped files and folders become rows; other files are counted and skipped; bad videos say why.
@@ -119,5 +120,21 @@ extension SelfTest {
         check("mostly 4:3 videos suggest a standard screen", !pal.widescreen)
         pal.widescreenChoice = true
         check("the screen choice overrides the suggestion", pal.widescreen)
+    }
+
+    /// S-044: the menu is drawn from the list, 6 titles to a page, at the standard's size.
+    private static func menuChecks(dvd: DVDModel) {
+        dvd.showSnapshot(.videoMenu)
+        let titles = dvd.items.compactMap { item -> DVDMenuTitle? in
+            if case .ready(let file) = item.state { DVDMenuTitle(name: file.title, thumbnail: item.picture) } else { nil }
+        }
+        for standard in TVStandard.allCases {
+            let pages = DVDMenuRenderer.render(discName: dvd.cleanDiscName, titles: titles, standard: standard)
+            check("7 videos make 2 menu pages (\(standard.title))", pages.count == 2 && pages[0].buttons.count >= 6)
+            let size = pages.first.flatMap { NSImage(data: $0.picture) }.map { ($0.representations.first?.pixelsWide ?? 0, $0.representations.first?.pixelsHigh ?? 0) }
+            check("the menu is drawn at \(standard.width)x\(standard.height) (\(standard.title))", size?.0 == standard.width && size?.1 == standard.height, "\(String(describing: size))")
+        }
+        check("the disc name is cut to 32 characters", { dvd.discName = String(repeating: "a", count: 50); return dvd.cleanDiscName.count == 32 }())
+        dvd.showSnapshot(.empty)
     }
 }

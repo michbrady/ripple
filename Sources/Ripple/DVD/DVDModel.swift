@@ -42,6 +42,14 @@ final class DVDModel: StoppableJob {
 
     var tooMany: Bool { items.count > 99 }
 
+    /// The name at the top of the menu and on the disc.
+    var discName = "My Videos"
+    /// Whether the Menu inspector is open.
+    var showsMenu = false
+
+    /// `discName` cleaned the way the menu shows it.
+    var cleanDiscName: String { DVDName.cleaned(discName, fallback: "Video DVD", limit: DVDName.maxDisc) }
+
     /// What the user chose in the bar. `nil` follows the videos.
     var standardChoice: TVStandard?
     var widescreenChoice: Bool?
@@ -196,7 +204,8 @@ final class DVDModel: StoppableJob {
     func showSnapshot(_ page: BurnSnapshotPage) {
         skipped = 0
         items = []
-        guard page == .videoList || page == .videoOver else { return }
+        showsMenu = page == .videoMenu
+        guard page == .videoList || page == .videoOver || page == .videoMenu else { return }
         func video(_ name: String, _ seconds: Double) -> DVDItem {
             let url = URL(fileURLWithPath: "/Movies/\(name).mp4")
             let file = VideoFile(url: url, title: VideoProbe.defaultTitle(for: url), bytes: Int(seconds * 450_000), seconds: seconds,
@@ -204,6 +213,12 @@ final class DVDModel: StoppableJob {
             return DVDItem(url: url, state: .ready(file), picture: FixtureVideoSource.gradient(seed: abs(name.hashValue)))
         }
         items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142)]
+        if page == .videoMenu {
+            items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142),
+                     video("Wedding", 1_800), video("Honeymoon", 1_200), video("Graduation", 900)]
+            discName = "Summer Trip"
+            return
+        }
         if page == .videoOver {
             items += [video("Wedding", 5_400), video("Honeymoon", 4_800), video("Graduation", 3_900)]
             skipped = 0

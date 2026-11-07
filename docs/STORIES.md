@@ -551,8 +551,8 @@ UX:
 - States: with no videos "Add videos to see the menu."; more than 6 videos shows page dots and "Page 1 of 2"
 - Words: toolbar button "Menu", tooltip "Show the menu preview and choices (⌥⌘M)"; the disc name field is above the list: "Disc Name"
 - Access: the inspector toggles from the keyboard; the preview image has the label "Menu page 1 of 2: Summer Trip, 6 videos"
-Status: doing
-Note: Layout, drawing, button links, and the four-color overlay rules are built and tested (DVDMenuTests). A real spumux run and a player check wait for dvdauthor.
+Status: done
+Note: The Menu inspector (toolbar button, ⌥⌘M) draws every page with Ripple's own renderer. Snapshot page: `burn-videoMenu`. The Disc Name is the editable title above the list. [manual] player check still waits for a real disc.
 
 ### S-049 Choose a menu look
 As the user, I pick one of four looks for the menu: Classic, Midnight, Daylight, or Warm.

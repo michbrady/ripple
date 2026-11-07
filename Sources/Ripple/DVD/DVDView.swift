@@ -7,6 +7,7 @@ struct DVDView: View {
     @Environment(DVDModel.self) private var dvd
 
     var body: some View {
+        @Bindable var dvd = dvd
         VStack(spacing: 0) {
             DiscTypeHeader()
             Divider()
@@ -15,6 +16,9 @@ struct DVDView: View {
             DVDBar()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .inspector(isPresented: $dvd.showsMenu) {
+            DVDMenuInspector().inspectorColumnWidth(min: 260, ideal: 320, max: 420)
+        }
     }
 }
 
@@ -61,9 +65,14 @@ struct DVDList: View {
     @State private var renaming: URL?
 
     var body: some View {
-        VStack(spacing: 0) {
+        @Bindable var dvd = dvd
+        return VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: Space.xs) {
+                    TextField("Disc Name", text: $dvd.discName)
+                        .textFieldStyle(.plain).font(.title2.bold()).lineLimit(1)
+                        .onChange(of: dvd.discName) { _, name in if name.count > DVDName.maxDisc { dvd.discName = String(name.prefix(DVDName.maxDisc)) } }
+                        .accessibilityLabel("Disc Name")
                     Text(summary).font(.callout).foregroundStyle(.secondary)
                     if dvd.skipped > 0 {
                         Text("\(dvd.skipped) \(dvd.skipped == 1 ? "file was" : "files were") skipped because \(dvd.skipped == 1 ? "it is" : "they are") not \(dvd.skipped == 1 ? "a video" : "videos").")

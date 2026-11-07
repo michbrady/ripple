@@ -347,7 +347,8 @@ final class BurnModel: StoppableJob {
     /// Puts the window in the state a snapshot shows, on made-up files and a made-up burner.
     func showSnapshot(_ page: BurnSnapshotPage) {
         watcher?.cancel()
-        watcher = nil
+        // A finished placeholder, so the page appearing later does not start watching the burner and replace the made-up disc.
+        watcher = Task {}
         func file(_ n: Int, _ title: String, _ artist: String, _ seconds: Double) -> BurnItem {
             BurnItem(url: URL(fileURLWithPath: "/Music/Mix/\(String(format: "%02d", n)) \(title).mp3"), title: title,
                      artist: artist, seconds: seconds, bytes: Int(seconds * 24_000), trackNumber: n)
@@ -386,7 +387,7 @@ final class BurnModel: StoppableJob {
             items = list + (7...20).map { file($0, "Long Piece \($0)", "The Tones", 330) }
             sourceFolder = URL(fileURLWithPath: "/Music/Mix", isDirectory: true)
             deviceState = FixtureBurner.blankCD()
-        case .videoList, .videoOver:
+        case .videoList, .videoOver, .videoMenu:
             type = .video
             items = []
             deviceState = FixtureBurner.blankDVD()
@@ -419,5 +420,5 @@ final class BurnModel: StoppableJob {
 }
 
 enum BurnSnapshotPage: String, CaseIterable {
-    case empty, list, folders, noDisc, over, dvd, burning, done, failed, videoEmpty, videoList, videoOver
+    case empty, list, folders, noDisc, over, dvd, burning, done, failed, videoEmpty, videoList, videoOver, videoMenu
 }

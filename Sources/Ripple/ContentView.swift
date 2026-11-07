@@ -36,6 +36,14 @@ struct ContentView: View {
                 .help("Switch between ripping a disc and burning one")
             }
             ToolbarItem {
+                if model.mode == .burn, burn.type == .video {
+                    @Bindable var dvd = dvd
+                    Toggle("Menu", systemImage: "rectangle.grid.2x2", isOn: $dvd.showsMenu)
+                        .help("Show the menu preview and choices (⌥⌘M)")
+                        .keyboardShortcut("m", modifiers: [.command, .option])
+                }
+            }
+            ToolbarItem {
                 if model.mode == .burn {
                     Button("Eject", systemImage: "eject") { burn.eject() }
                         .help("Eject the disc (⌘E)")
