@@ -58,6 +58,7 @@ struct DVDEmpty: View {
 /// The videos on the disc, with a line of totals and anything left out.
 struct DVDList: View {
     @Environment(DVDModel.self) private var dvd
+    @State private var renaming: URL?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -80,8 +81,28 @@ struct DVDList: View {
             .padding(.horizontal, Space.margin)
             .padding(.vertical, Space.md)
             Divider()
-            List(dvd.items) { DVDRow(item: $0) }
-                .listStyle(.plain)
+            @Bindable var dvd = dvd
+            List(selection: $dvd.selection) {
+                ForEach(dvd.items) { item in
+                    DVDRow(item: item, renaming: $renaming)
+                        .tag(item.id)
+                        .contextMenu {
+                            Button("Rename") { renaming = item.id }
+                            Button("Move Up") { dvd.moveSelectionUp() }.disabled(!dvd.canMoveUp)
+                            Button("Move Down") { dvd.moveSelectionDown() }.disabled(!dvd.canMoveDown)
+                            Divider()
+                            Button("Remove") { dvd.remove(ids: dvd.selection.isEmpty ? [item.id] : dvd.selection.union([item.id])) }
+                        }
+                }
+                .onMove { dvd.move(from: $0, to: $1) }
+            }
+            .listStyle(.plain)
+            .onDeleteCommand { dvd.remove(ids: dvd.selection) }
+            .onKeyPress(.return) {
+                guard dvd.selection.count == 1, let id = dvd.selection.first, dvd.title(of: id) != nil else { return .ignored }
+                renaming = id
+                return .handled
+            }
         }
     }
 
@@ -92,13 +113,20 @@ struct DVDList: View {
 }
 
 struct DVDRow: View {
+    @Environment(DVDModel.self) private var dvd
     let item: DVDItem
+    @Binding var renaming: URL?
+    @State private var draft = ""
+    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: Space.md) {
             picture
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).lineLimit(1).truncationMode(.tail).help(item.url.path)
+                if renaming == item.id { nameField } else {
+                    Text(title).lineLimit(1).truncationMode(.tail).help(item.url.path)
+                        .onTapGesture(count: 2) { if case .ready = item.state { renaming = item.id } }
+                }
                 detail
             }
             Spacer()
@@ -112,6 +140,22 @@ struct DVDRow: View {
         }
         .listRowInsets(EdgeInsets(top: Space.xs, leading: Space.margin, bottom: Space.xs, trailing: Space.margin))
         .accessibilityElement(children: .combine)
+    }
+
+    private var nameField: some View {
+        TextField("Title", text: $draft)
+            .textFieldStyle(.roundedBorder)
+            .focused($focused)
+            .onAppear {
+                draft = title
+                focused = true
+            }
+            .onSubmit {
+                dvd.rename(item.id, to: draft)
+                renaming = nil
+            }
+            .onExitCommand { renaming = nil }
+            .accessibilityLabel("Video title")
     }
 
     private var title: String {

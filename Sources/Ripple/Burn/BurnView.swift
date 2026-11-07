@@ -22,6 +22,7 @@ struct BurnView: View {
         }
         .onAppear {
             burn.undoManager = undoManager
+            dvd.undoManager = undoManager
             burn.start()
         }
         .dropDestination(for: URL.self) { urls, _ in

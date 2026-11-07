@@ -499,8 +499,8 @@ UX:
 - States: a long title truncates in the row and shows in full in the tooltip; a title cut for the menu shows "Shown on the menu as “…”" under the field while it is being edited
 - Words: "Move Up", "Move Down", "Rename", "Remove", "Undo Remove Video"
 - Access: every action works from the keyboard; the context menu has all of them; VoiceOver announces "Moved to position 2 of 5"
-Status: doing
-Note: Names are cleaned and cut (tested). The list and its controls are not built yet.
+Status: done
+Note: Rename (double-click or Return), drag to reorder, Move Up and Move Down (⌥⌘↑ and ⌥⌘↓, also in the context menu), Remove (Delete key), and Undo are in the list and covered by the self-test. Dragging by hand is not yet tried.
 
 ### S-042 See if it fits, and how good it will look
 As the user, I see a bar for the disc and a word for the picture quality, and I am told when there is too much.

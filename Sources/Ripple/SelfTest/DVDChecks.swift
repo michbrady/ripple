@@ -44,6 +44,36 @@ extension SelfTest {
         check("the folder's videos were added, and the text file skipped", dvd.items.count == 5 && dvd.skipped == 1, "\(dvd.items.count) rows, \(dvd.skipped) skipped")
         check("a video added twice is listed once", await { await dvd.add([folder.appending(path: "one.mp4")]); return dvd.items.count == 5 }())
         check("every ready video has a picture", dvd.items.allSatisfy { if case .ready = $0.state { $0.picture != nil } else { true } })
+
+        // S-041: rename, reorder, remove, and Undo.
+        let um = UndoManager()
+        um.groupsByEvent = false
+        dvd.undoManager = um
+        func act(_ change: () -> Void) { um.beginUndoGrouping(); change(); um.endUndoGrouping() }
+        func ids() -> [URL] { dvd.items.map(\.id) }
+        let start = ids(), startTitles = dvd.videos.map(\.title)
+        let first = start[0]
+        act { dvd.rename(first, to: "  Summer\n  Trip  ") }
+        check("a title is cleaned of line breaks and extra spaces", dvd.title(of: first) == "Summer Trip")
+        act { dvd.rename(first, to: String(repeating: "x", count: 80)) }
+        check("a long title is cut to fit the menu", dvd.title(of: first)?.count == DVDName.maxTitle)
+        act { dvd.rename(first, to: "   ") }
+        check("an empty title goes back to the file's name", dvd.title(of: first) == "one")
+        dvd.selection = [start[1]]
+        act { dvd.moveSelectionUp() }
+        check("Move Up swaps a video with the one above", ids() == [start[1], start[0]] + start[2...])
+        dvd.selection = [first]
+        act { dvd.moveSelectionDown() }
+        check("Move Down swaps a video with the one below", ids() == [start[1], start[2], start[0]] + start[3...])
+        check("the top video cannot move up, the bottom cannot move down",
+              { dvd.selection = [ids()[0]]; return !dvd.canMoveUp }() && { dvd.selection = [ids().last!]; return !dvd.canMoveDown }())
+        act { dvd.move(from: IndexSet(integer: 0), to: dvd.items.count) }
+        check("dragging a row to the end reorders the list", ids().last == start[1])
+        act { dvd.remove(ids: [ids()[0]]) }
+        check("Remove takes a video off the list", dvd.items.count == start.count - 1)
+        while um.canUndo { um.undo() }
+        check("Undo brings back every change, in order", ids() == start && dvd.videos.map(\.title) == startTitles, "\(ids().map(\.lastPathComponent))")
+        dvd.undoManager = nil
         dvd.showSnapshot(.empty)
     }
 }

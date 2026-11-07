@@ -55,6 +55,12 @@ struct RippleApp: App {
                     .disabled(model.mode == .burn ? burn.isBusy : !model.hasDisc)
             }
             CommandGroup(after: .pasteboard) {
+                Button("Move Video Up") { dvd.moveSelectionUp() }
+                    .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+                    .disabled(model.mode == .rip || burn.type != .video || !dvd.canMoveUp)
+                Button("Move Video Down") { dvd.moveSelectionDown() }
+                    .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+                    .disabled(model.mode == .rip || burn.type != .video || !dvd.canMoveDown)
                 Button("Check All Tracks") { for index in model.rows.indices { model.rows[index].include = true } }
                     .keyboardShortcut("a", modifiers: [.command, .option])
                     .disabled(model.phase != .ready)

@@ -21,6 +21,11 @@ final class DVDModel: StoppableJob {
     private(set) var skipped = 0
     private(set) var isReading = false
 
+    /// The rows selected in the list. Move Up, Move Down, and Remove act on these.
+    var selection = Set<URL>()
+    /// Edit > Undo for removing, moving, and renaming.
+    var undoManager: UndoManager?
+
     @ObservationIgnored private let source: any VideoSource
 
     init(source: any VideoSource = VideoSources.make()) {
@@ -100,6 +105,64 @@ final class DVDModel: StoppableJob {
         }
         urls.forEach(visit)
         return (videos, skipped)
+    }
+
+    // MARK: Order, names, and removing
+
+    func title(of id: URL) -> String? {
+        guard let item = items.first(where: { $0.id == id }), case .ready(let file) = item.state else { return nil }
+        return file.title
+    }
+
+    /// Renames a title, cut and cleaned for the menu. An empty name goes back to the file's own.
+    func rename(_ id: URL, to text: String) {
+        guard let index = items.firstIndex(where: { $0.id == id }), case .ready(var file) = items[index].state else { return }
+        let title = DVDName.cleaned(text, fallback: VideoProbe.defaultTitle(for: id))
+        guard title != file.title else { return }
+        let before = items
+        file.title = title
+        items[index].state = .ready(file)
+        registerUndo("Rename Video", from: before)
+    }
+
+    func remove(ids: Set<URL>) {
+        guard !ids.isEmpty else { return }
+        let before = items
+        items.removeAll { ids.contains($0.id) }
+        selection.subtract(ids)
+        registerUndo(ids.count == 1 ? "Remove Video" : "Remove \(ids.count) Videos", from: before)
+    }
+
+    func move(from source: IndexSet, to destination: Int) {
+        let before = items
+        items.move(fromOffsets: source, toOffset: destination)
+        registerUndo("Reorder Videos", from: before)
+    }
+
+    var canMoveUp: Bool { selectedIndexes.first.map { $0 > 0 } ?? false }
+    var canMoveDown: Bool { selectedIndexes.last.map { $0 < items.count - 1 } ?? false }
+
+    func moveSelectionUp() {
+        guard canMoveUp else { return }
+        move(from: IndexSet(selectedIndexes), to: selectedIndexes[0] - 1)
+    }
+
+    func moveSelectionDown() {
+        guard canMoveDown else { return }
+        move(from: IndexSet(selectedIndexes), to: selectedIndexes[selectedIndexes.count - 1] + 2)
+    }
+
+    private var selectedIndexes: [Int] { items.indices.filter { selection.contains(items[$0].id) } }
+
+    private func registerUndo(_ name: String, from before: [DVDItem]) {
+        undoManager?.registerUndo(withTarget: self) { model in model.restore(before) }
+        undoManager?.setActionName(name)
+    }
+
+    private func restore(_ state: [DVDItem]) {
+        let current = items
+        items = state
+        undoManager?.registerUndo(withTarget: self) { model in model.restore(current) }
     }
 
     // MARK: Snapshot
