@@ -118,13 +118,28 @@ public struct DVDBuilder: Sendable {
                 let r = try await ProcessRunner.run(tools.ffmpeg, DVDAuthoring.thumbnailArguments(input: file.url, output: out, at: at))
                 thumbs.append(r.status == 0 ? Self.load(out) : nil)   // a missing picture leaves a black button, not a failed disc
             }
+            // A picture for each chapter of a title that has chapters, for the scene pages.
+            var chapterPictures: [[CGImage?]] = []
+            for (index, file) in project.files.enumerated() {
+                var pictures: [CGImage?] = []
+                let starts = DVDAuthoring.chapterStarts(seconds: file.seconds)
+                if starts.count > 1 {
+                    for (chapter, start) in starts.enumerated() {
+                        let out = work.appending(path: "thumbs/\(index + 1)-\(chapter + 1).png")
+                        let at = min(start + 5, max(0, file.seconds - 1))
+                        let r = try await ProcessRunner.run(tools.ffmpeg, DVDAuthoring.thumbnailArguments(input: file.url, output: out, at: at))
+                        pictures.append(r.status == 0 ? Self.load(out) : nil)
+                    }
+                }
+                chapterPictures.append(pictures)
+            }
 
             // 2. The menu pages, and the buttons laid over them.
             report(.menus)
-            let titles = project.files.enumerated().map { DVDMenuTitle(name: $0.element.title, thumbnail: thumbs[$0.offset]) }
+            let titles = project.files.enumerated().map { DVDMenuTitle(name: $0.element.title, thumbnail: thumbs[$0.offset], seconds: $0.element.seconds, chapterPictures: chapterPictures[$0.offset]) }
             let background = project.background.flatMap { Self.load($0) }
             let pages = DVDMenuRenderer.render(discName: project.discName, titles: titles, standard: project.standard, look: project.look, background: background)
-            var menuFiles: [String] = []
+            var menuFiles: [String] = [], sceneMenuFiles: [String] = []
             // The menu video lasts as long as the music (5 to 90 seconds), or 5 seconds in silence.
             var menuSeconds = 5
             if let music = project.music {
@@ -148,7 +163,7 @@ public struct DVDBuilder: Sendable {
                     throw DVDBuildError.failed(step: "Adding the menu buttons", detail: Self.tail(buttons.error))
                 }
                 try? fm.removeItem(at: plain)
-                menuFiles.append("menu/menu\(n).mpg")
+                if page.kind == .main { menuFiles.append("menu/menu\(n).mpg") } else { sceneMenuFiles.append("menu/menu\(n).mpg") }
             }
 
             // 3. Convert every video. This is the slow part.
@@ -173,7 +188,8 @@ public struct DVDBuilder: Sendable {
 
             // 4. The disc's own files.
             report(.authoring)
-            let xml = DVDAuthoring.authorXML(standard: project.standard, widescreen: project.widescreen, titles: specs, pages: pages.map(\.buttons), menuFiles: menuFiles)
+            let xml = DVDAuthoring.authorXML(standard: project.standard, widescreen: project.widescreen, titles: specs, pages: pages.filter { $0.kind == .main }.map(\.buttons), menuFiles: menuFiles,
+                                            scenePages: pages.filter { $0.kind == .scenes }.map(\.buttons), sceneMenuFiles: sceneMenuFiles)
             try xml.write(to: work.appending(path: "dvd.xml"), atomically: true, encoding: .utf8)
             let disc = work.appending(path: "disc")
             let authored = try await ProcessRunner.run(tools.dvdauthor, ["-o", disc.path, "-x", work.appending(path: "dvd.xml").path],

@@ -129,17 +129,23 @@ extension SelfTest {
     private static func menuChecks(dvd: DVDModel) {
         dvd.showSnapshot(.videoMenu)
         let titles = dvd.items.compactMap { item -> DVDMenuTitle? in
-            if case .ready(let file) = item.state { DVDMenuTitle(name: file.title, thumbnail: item.picture) } else { nil }
+            if case .ready(let file) = item.state { DVDMenuTitle(name: file.title, thumbnail: item.picture, seconds: file.seconds) } else { nil }
         }
         for standard in TVStandard.allCases {
             let pages = DVDMenuRenderer.render(discName: dvd.cleanDiscName, titles: titles, standard: standard)
-            check("7 videos make 2 menu pages (\(standard.title))", pages.count == 2 && pages[0].buttons.count >= 6)
+            check("7 videos make 2 main menu pages (\(standard.title))", pages.filter { $0.kind == .main }.count == 2 && pages[0].buttons.count >= 6)
             let size = pages.first.flatMap { NSImage(data: $0.picture) }.map { ($0.representations.first?.pixelsWide ?? 0, $0.representations.first?.pixelsHigh ?? 0) }
             check("the menu is drawn at \(standard.width)x\(standard.height) (\(standard.title))", size?.0 == standard.width && size?.1 == standard.height, "\(String(describing: size))")
         }
         let pictures = MenuLook.allCases.map { look in DVDMenuRenderer.render(discName: "Look", titles: titles, standard: .ntsc, look: look)[0].picture }
         check("each of the four looks draws its own menu", Set(pictures).count == 4 && MenuLook.allCases.map(\.title) == ["Classic", "Midnight", "Daylight", "Warm"])
         check("every look keeps its text readable (7 to 1)", MenuLook.allCases.allSatisfy { $0.textContrast >= 7 })
+        // S-051: titles over 10 minutes get scene pages after the main pages, in the preview too.
+        let drawn = DVDMenuRenderer.render(discName: dvd.cleanDiscName, titles: titles, standard: .ntsc)
+        check("long titles get scene pages after the main pages", drawn.filter { $0.kind == .main }.count == 2 && drawn.filter { $0.kind == .scenes }.count == 8, "\(drawn.map(\.kind))")
+        check("the main menu has a Scenes button, and scene pages have Main Menu",
+              drawn.first?.buttons.contains { $0.action == .scenes } == true && drawn.last?.buttons.contains { $0.action == .mainMenu } == true)
+        check("a title under 10 minutes has no scenes", DVDMenuLayout.scenePages(for: [DVDMenuTitle(name: "Short", seconds: 142)]).isEmpty)
         check("the disc name is cut to 32 characters", { dvd.discName = String(repeating: "a", count: 50); return dvd.cleanDiscName.count == 32 }())
         dvd.showSnapshot(.empty)
     }

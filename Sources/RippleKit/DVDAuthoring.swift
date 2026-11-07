@@ -123,15 +123,23 @@ public enum DVDAuthoring {
     /// The command a menu button runs. (From the menu, dvdauthor accepts `jump title N` and refuses `jump titleset 1 title N`; checked with the real program.) `g1` remembers whether Play All is on, so each title knows whether to carry on to the next.
     static func command(for action: DVDMenuAction, page: Int) -> String {
         switch action {
-        case .title(let n): "g1 = 0; jump title \(n);"
-        case .playAll: "g1 = 1; jump title 1;"
+        case .title(let n): "g1 = 0; g2 = 0; jump title \(n);"
+        case .playAll: "g1 = 1; g2 = 0; jump title 1;"
         case .next: "jump menu \(page + 2);"
         case .previous: "jump menu \(page);"
+        // `g2 = 1` remembers that a scene page started the video, so it ends back at the scenes. The first scene page is the titleset's
+        // "ptt" entry. From a titleset menu only `jump` works; from the main menu only `jump title N` and `jump titleset 1 menu entry ptt` do
+        // (all checked with the real dvdauthor).
+        case .scenes: "jump titleset 1 menu entry ptt;"
+        case .chapter(let title, let chapter): "g1 = 0; g2 = 1; jump title \(title) chapter \(chapter);"
+        case .mainMenu: "jump vmgm menu 1;"
         }
     }
 
     /// The whole disc: a menu page per `menuFiles` entry, and every title in one titleset.
-    public static func authorXML(standard: TVStandard, widescreen: Bool, titles: [DVDTitleSpec], pages: [[DVDMenuButton]], menuFiles: [String]) -> String {
+    /// `scenePages` are the chapter pages. They live in the titleset's own menus, because the main menu cannot jump to a chapter.
+    public static func authorXML(standard: TVStandard, widescreen: Bool, titles: [DVDTitleSpec], pages: [[DVDMenuButton]], menuFiles: [String],
+                                 scenePages: [[DVDMenuButton]] = [], sceneMenuFiles: [String] = []) -> String {
         var xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<dvdauthor>\n  <vmgm>\n    <fpc>g1 = 0; jump vmgm menu 1;</fpc>\n    <menus>\n"
         xml += "      <video format=\"\(standard.format)\" aspect=\"4:3\" />\n      <audio format=\"ac3\" lang=\"en\" />\n"
         for (index, buttons) in pages.enumerated() {
@@ -141,12 +149,26 @@ public enum DVDAuthoring {
             }
             xml += "        <vob file=\"\(escape(menuFiles[index]))\" pause=\"inf\" />\n      </pgc>\n"
         }
-        xml += "    </menus>\n  </vmgm>\n  <titleset>\n    <titles>\n"
+        xml += "    </menus>\n  </vmgm>\n  <titleset>\n"
+        if !scenePages.isEmpty {
+            xml += "    <menus>\n      <video format=\"\(standard.format)\" aspect=\"4:3\" />\n      <audio format=\"ac3\" lang=\"en\" />\n"
+            for (index, buttons) in scenePages.enumerated() {
+                xml += "      <pgc\(index == 0 ? " entry=\"ptt\"" : "") pause=\"inf\">\n"
+                for button in buttons {
+                    xml += "        <button name=\"\(button.name)\"> \(command(for: button.action, page: index)) </button>\n"
+                }
+                xml += "        <vob file=\"\(escape(sceneMenuFiles[index]))\" pause=\"inf\" />\n      </pgc>\n"
+            }
+            xml += "    </menus>\n"
+        }
+        xml += "    <titles>\n"
         xml += "      <video format=\"\(standard.format)\" aspect=\"\(widescreen ? "16:9" : "4:3")\"\(widescreen ? " widescreen=\"nopanscan\"" : "") />\n      <audio format=\"ac3\" lang=\"en\" />\n"
         for title in titles {
             let carryOn = title.number < titles.count ? "if (g1 eq 1) jump title \(title.number + 1); " : ""
             xml += "      <pgc>\n        <vob file=\"\(escape(title.file))\" chapters=\"\(chapterAttribute(seconds: title.seconds))\" />\n"
-            xml += "        <post> \(carryOn)g1 = 0; call vmgm menu 1; </post>\n      </pgc>\n"
+            // Started from a scene page: go back to the scenes. (Only the first scene page can be called, so that is where it lands.)
+            let backToScenes = scenePages.isEmpty ? "" : "if (g2 eq 1) { g2 = 0; call menu entry ptt; } "
+            xml += "        <post> \(carryOn)\(backToScenes)g1 = 0; call vmgm menu 1; </post>\n      </pgc>\n"
         }
         xml += "    </titles>\n  </titleset>\n</dvdauthor>\n"
         return xml

@@ -7,7 +7,6 @@ struct DVDMenuInspector: View {
     @Environment(DVDModel.self) private var dvd
     @Environment(BurnModel.self) private var burn
     @State private var pages: [NSImage] = []
-    @State private var page = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
@@ -26,11 +25,11 @@ struct DVDMenuInspector: View {
 
     private var preview: some View {
         Group {
-            if pages.indices.contains(page) {
-                Image(nsImage: pages[page]).resizable().aspectRatio(contentMode: .fit)
+            if pages.indices.contains(dvd.menuPage) {
+                Image(nsImage: pages[dvd.menuPage]).resizable().aspectRatio(contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(.separator))
-                    .accessibilityLabel("Menu page \(page + 1) of \(pages.count): \(dvd.cleanDiscName), \(dvd.look.title) look, \(dvd.videos.count) videos")
+                    .accessibilityLabel("Menu page \(dvd.menuPage + 1) of \(pages.count): \(dvd.cleanDiscName), \(dvd.look.title) look, \(dvd.videos.count) videos")
             } else {
                 Rectangle().fill(.quaternary).aspectRatio(4.0 / 3, contentMode: .fit)
             }
@@ -74,28 +73,28 @@ struct DVDMenuInspector: View {
 
     private var pager: some View {
         HStack {
-            Button("Previous Page", systemImage: "chevron.left") { page = max(0, page - 1) }
-                .labelStyle(.iconOnly).disabled(page == 0)
+            Button("Previous Page", systemImage: "chevron.left") { dvd.menuPage = max(0, dvd.menuPage - 1) }
+                .labelStyle(.iconOnly).disabled(dvd.menuPage == 0)
                 .help("Show the previous menu page")
-            Text("Page \(page + 1) of \(pages.count)").monospacedDigit().foregroundStyle(.secondary)
+            Text("Page \(dvd.menuPage + 1) of \(pages.count)").monospacedDigit().foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
-            Button("Next Page", systemImage: "chevron.right") { page = min(pages.count - 1, page + 1) }
-                .labelStyle(.iconOnly).disabled(page >= pages.count - 1)
+            Button("Next Page", systemImage: "chevron.right") { dvd.menuPage = min(pages.count - 1, dvd.menuPage + 1) }
+                .labelStyle(.iconOnly).disabled(dvd.menuPage >= pages.count - 1)
                 .help("Show the next menu page")
         }
         .buttonStyle(.borderless)
-        .onKeyPress(.leftArrow) { page = max(0, page - 1); return .handled }
-        .onKeyPress(.rightArrow) { page = min(pages.count - 1, page + 1); return .handled }
+        .onKeyPress(.leftArrow) { dvd.menuPage = max(0, dvd.menuPage - 1); return .handled }
+        .onKeyPress(.rightArrow) { dvd.menuPage = min(pages.count - 1, dvd.menuPage + 1); return .handled }
     }
 
     /// Draws the pages. Nothing is converted: this is Ripple's own drawing.
     private func render() {
         let titles = dvd.items.compactMap { item -> DVDMenuTitle? in
-            if case .ready(let file) = item.state { DVDMenuTitle(name: file.title, thumbnail: item.picture) } else { nil }
+            if case .ready(let file) = item.state { DVDMenuTitle(name: file.title, thumbnail: item.picture, seconds: file.seconds) } else { nil }
         }
         guard !titles.isEmpty else { pages = []; return }
         let drawn = DVDMenuRenderer.render(discName: dvd.cleanDiscName, titles: titles, standard: dvd.standard, look: dvd.look, background: dvd.backgroundImage)
         pages = drawn.compactMap { NSImage(data: $0.picture) }
-        page = min(page, max(0, pages.count - 1))
+        dvd.menuPage = min(dvd.menuPage, max(0, pages.count - 1))
     }
 }

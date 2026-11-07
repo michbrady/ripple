@@ -135,3 +135,53 @@ final class DVDMenuTests: XCTestCase {
         try page.highlight.write(to: URL(fileURLWithPath: "/tmp/ripple-menu-sample-highlight.png"))
     }
 }
+
+final class DVDSceneMenuTests: XCTestCase {
+    func title(_ minutes: Double) -> DVDMenuTitle { DVDMenuTitle(name: "T", seconds: minutes * 60) }
+
+    func testOnlyLongTitlesGetScenePages() {
+        let pages = DVDMenuLayout.scenePages(for: [title(5), title(25), title(9.9), title(40)])
+        XCTAssertEqual(pages.map(\.title), [1, 3, 3])           // 25 min: one page of 5 chapters; 40 min: 8 chapters, two pages
+        XCTAssertEqual(pages.map(\.chapters), [0..<5, 0..<6, 6..<8])
+        XCTAssertEqual(DVDMenuLayout.scenePages(for: [title(5), title(9)]).count, 0)
+    }
+
+    func testSceneButtonsLinkChaptersAndMoveBetweenPages() {
+        let first = DVDMenuLayout.sceneButtons(title: 2, chapters: 0..<6, sceneIndex: 0, sceneCount: 2, standard: .ntsc)
+        XCTAssertEqual(first.map(\.action).prefix(2), [.chapter(title: 3, chapter: 1), .chapter(title: 3, chapter: 2)])
+        XCTAssertTrue(first.contains { $0.action == .mainMenu })
+        XCTAssertTrue(first.contains { $0.action == .next }); XCTAssertFalse(first.contains { $0.action == .previous })
+        let last = DVDMenuLayout.sceneButtons(title: 2, chapters: 6..<8, sceneIndex: 1, sceneCount: 2, standard: .pal)
+        XCTAssertTrue(last.contains { $0.action == .previous }); XCTAssertFalse(last.contains { $0.action == .next })
+        for button in first + last { XCTAssertTrue(button.x0 >= 48 && button.x1 <= 720 - 48 && button.y1 < 576) }
+    }
+
+    func testMainPagesGetAScenesButtonOnlyWhenThereAreScenes() {
+        XCTAssertFalse(DVDMenuLayout.buttons(titles: 0..<2, page: 0, pageCount: 1, standard: .ntsc).contains { $0.action == .scenes })
+        XCTAssertTrue(DVDMenuLayout.buttons(titles: 0..<2, page: 0, pageCount: 1, standard: .ntsc, hasScenes: true).contains { $0.action == .scenes })
+    }
+
+    func testTheRendererDrawsMainThenScenePagesAtTheRightSize() {
+        let pages = DVDMenuRenderer.render(discName: "Disc", titles: [title(5), title(40)], standard: .ntsc)
+        XCTAssertEqual(pages.map(\.kind), [.main, .scenes, .scenes])
+        XCTAssertTrue(pages[0].buttons.contains { $0.action == .scenes })
+        XCTAssertEqual(DVDMenuRenderer.render(discName: "Disc", titles: [title(5)], standard: .ntsc).map(\.kind), [.main])
+    }
+
+    func testTheDiscDescriptionPutsScenesInTheTitlesetMenus() {
+        let titles = [title(40)]
+        let rendered = DVDMenuRenderer.render(discName: "Disc", titles: titles, standard: .ntsc)
+        let main = rendered.filter { $0.kind == .main }, scenes = rendered.filter { $0.kind == .scenes }
+        let xml = DVDAuthoring.authorXML(standard: .ntsc, widescreen: true, titles: [DVDTitleSpec(number: 1, name: "T", file: "titles/title1.mpg", seconds: 2_400)],
+                                         pages: main.map(\.buttons), menuFiles: ["menu/menu1.mpg"],
+                                         scenePages: scenes.map(\.buttons), sceneMenuFiles: ["menu/menu2.mpg", "menu/menu3.mpg"])
+        XCTAssertTrue(xml.contains("jump titleset 1 menu entry ptt;"))          // the Scenes button on the main menu
+        XCTAssertEqual(xml.components(separatedBy: "<pgc entry=\"ptt\"").count - 1, 1)
+        XCTAssertTrue(xml.contains("g1 = 0; g2 = 1; jump title 1 chapter 1;"))
+        XCTAssertTrue(xml.contains("jump vmgm menu 1;"))                         // Main Menu on a scene page
+        XCTAssertTrue(xml.contains("if (g2 eq 1) { g2 = 0; call menu entry ptt; }"))
+        let withoutScenes = DVDAuthoring.authorXML(standard: .ntsc, widescreen: true, titles: [DVDTitleSpec(number: 1, name: "T", file: "t.mpg", seconds: 60)],
+                                                   pages: main.map(\.buttons), menuFiles: ["menu/menu1.mpg"])
+        XCTAssertFalse(withoutScenes.contains("entry=\"ptt\"")); XCTAssertFalse(withoutScenes.contains("call menu entry"))
+    }
+}

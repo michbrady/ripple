@@ -602,7 +602,14 @@ UX:
 - States: titles under 10 minutes have no Scenes button and the preview says nothing
 - Words: the menu button reads "Scenes"; the player's chapter button is the player's own
 - Access: none beyond S-052
-Status: todo
+UX:
+- Flow: Menu panel preview shows the scene pages after the main pages; on the disc, "Scenes" (beside Play All on every main page) -> a scene page of chapter pictures, each "Chapter 3 · 10:00" -> the video plays from that chapter -> when it ends the disc returns to the scenes
+- Surface: the Menu inspector (nothing new to configure)
+- States: a title under 10 minutes has no chapters and no scene pages; with none at all, the main menu has no Scenes button
+- Words: "Scenes", "Main Menu", "Chapter 3 · 10:00", page heading "Summer Trip: scenes"
+- Access: the same arrow-key navigation as the main menu
+Status: done
+Note: Built differently from the first sketch because the real dvdauthor refuses a chapter jump from the main menu: scene pages live in the titleset's own menus, one Scenes button on the main menu opens the first, and Previous and Next walk through the scene pages of every title in order. Returning after a video lands on the first scene page, because dvdauthor can only call a menu entry, not a particular page. A real 11-minute video builds into an image that holds the titleset menu (DVDRealBuildTests). Snapshot page: `burn-videoScenes`. [manual] A DVD player playing from a chosen chapter and coming back to the scenes is not yet checked.
 
 ### S-052 Preview the menu
 As the user, I see every menu page in the window before anything is converted.

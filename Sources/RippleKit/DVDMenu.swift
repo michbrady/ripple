@@ -11,6 +11,11 @@ public enum DVDMenuAction: Equatable, Sendable {
     case title(Int)
     case previous
     case next
+    /// The first scene page, in the titleset's own menus.
+    case scenes
+    /// Title and chapter, both 1-based.
+    case chapter(title: Int, chapter: Int)
+    case mainMenu
 }
 
 /// One button: where it is on the 720-wide menu picture, what it does, and which button the arrow keys reach.
@@ -27,6 +32,8 @@ public struct DVDMenuButton: Equatable, Sendable {
 
 /// One drawn page: the picture, the two button overlays (four colors each, no smoothing), and the buttons.
 public struct DVDMenuPage: Sendable {
+    public enum Kind: Equatable, Sendable { case main, scenes }
+    public var kind: Kind = .main
     public var picture: Data
     public var highlight: Data
     public var select: Data
@@ -36,7 +43,16 @@ public struct DVDMenuPage: Sendable {
 public struct DVDMenuTitle: @unchecked Sendable {
     public var name: String
     public var thumbnail: CGImage?
-    public init(name: String, thumbnail: CGImage? = nil) { self.name = name; self.thumbnail = thumbnail }
+    /// How long the video is. A title with chapters (see `DVDAuthoring.chapterStarts`) gets scene pages.
+    public var seconds: Double
+    /// A picture for each chapter, in order. Missing ones draw as a dark box with the chapter number.
+    public var chapterPictures: [CGImage?]
+    public init(name: String, thumbnail: CGImage? = nil, seconds: Double = 0, chapterPictures: [CGImage?] = []) {
+        self.name = name; self.thumbnail = thumbnail; self.seconds = seconds; self.chapterPictures = chapterPictures
+    }
+
+    public var chapterCount: Int { DVDAuthoring.chapterStarts(seconds: seconds).count }
+    public var hasChapters: Bool { chapterCount > 1 }
 }
 
 public enum DVDMenuLayout {
@@ -49,8 +65,41 @@ public enum DVDMenuLayout {
         return stride(from: 0, to: titleCount, by: perPage).map { $0..<min($0 + perPage, titleCount) }
     }
 
+    /// The scene pages, in order: each is some chapters (0-based) of one title (0-based).
+    public static func scenePages(for titles: [DVDMenuTitle], perPage: Int = DVDMenuLayout.perPage) -> [(title: Int, chapters: Range<Int>)] {
+        titles.enumerated().flatMap { index, title -> [(title: Int, chapters: Range<Int>)] in
+            guard title.hasChapters else { return [] }
+            return stride(from: 0, to: title.chapterCount, by: perPage).map { (index, $0..<min($0 + perPage, title.chapterCount)) }
+        }
+    }
+
+    /// The buttons of one scene page: a picture for each chapter, Main Menu, and Previous and Next between scene pages.
+    public static func sceneButtons(title: Int, chapters: Range<Int>, sceneIndex: Int, sceneCount: Int, standard: TVStandard) -> [DVDMenuButton] {
+        let h = standard.height
+        let scale = Double(h) / 480
+        func even(_ v: Double) -> Int { Int(v.rounded()) / 2 * 2 }
+        var buttons: [DVDMenuButton] = []
+        let cellW = 160, cellH = even(128 * scale), gapX = 48, left = 48
+        let rowTop = [even(112 * scale), even(112 * scale) + cellH + even(12 * scale)]
+        for (i, chapter) in chapters.enumerated() {
+            let col = i % columns, row = i / columns
+            let x = left + col * (cellW + gapX), y = rowTop[row]
+            buttons.append(DVDMenuButton(name: "b\(buttons.count + 1)", x0: x, y0: y, x1: x + cellW - 1, y1: y + cellH - 1, action: .chapter(title: title + 1, chapter: chapter + 1)))
+        }
+        let controlsY = even(404 * scale), controlsH = even(40 * scale)
+        buttons.append(DVDMenuButton(name: "b\(buttons.count + 1)", x0: 48, y0: controlsY, x1: 48 + 180 - 1, y1: controlsY + controlsH - 1, action: .mainMenu))
+        if sceneIndex > 0 {
+            buttons.append(DVDMenuButton(name: "b\(buttons.count + 1)", x0: 330, y0: controlsY, x1: 330 + 150 - 1, y1: controlsY + controlsH - 1, action: .previous))
+        }
+        if sceneIndex < sceneCount - 1 {
+            buttons.append(DVDMenuButton(name: "b\(buttons.count + 1)", x0: 522, y0: controlsY, x1: 522 + 150 - 1, y1: controlsY + controlsH - 1, action: .next))
+        }
+        return linkArrows(buttons)
+    }
+
     /// Where each button goes on a page of this TV standard. Safe margins keep everything inside what every TV shows.
-    public static func buttons(titles: Range<Int>, page: Int, pageCount: Int, standard: TVStandard) -> [DVDMenuButton] {
+    /// `hasScenes` adds a Scenes button beside Play All.
+    public static func buttons(titles: Range<Int>, page: Int, pageCount: Int, standard: TVStandard, hasScenes: Bool = false) -> [DVDMenuButton] {
         let h = standard.height
         let scale = Double(h) / 480
         func even(_ v: Double) -> Int { Int(v.rounded()) / 2 * 2 }
@@ -64,6 +113,9 @@ public enum DVDMenuLayout {
         }
         let controlsY = even(404 * scale), controlsH = even(40 * scale)
         buttons.append(DVDMenuButton(name: "b\(buttons.count + 1)", x0: 48, y0: controlsY, x1: 48 + 180 - 1, y1: controlsY + controlsH - 1, action: .playAll))
+        if hasScenes {
+            buttons.append(DVDMenuButton(name: "b\(buttons.count + 1)", x0: 236, y0: controlsY, x1: 236 + 80 - 1, y1: controlsY + controlsH - 1, action: .scenes))
+        }
         if page > 0 {
             buttons.append(DVDMenuButton(name: "b\(buttons.count + 1)", x0: 330, y0: controlsY, x1: 330 + 150 - 1, y1: controlsY + controlsH - 1, action: .previous))
         }
@@ -148,14 +200,24 @@ public enum DVDMenuRenderer {
     /// `background` is the user's own picture; it is cropped to fill the menu and covered so the text stays readable.
     public static func render(discName: String, titles: [DVDMenuTitle], standard: TVStandard, look: MenuLook = .classic, background: CGImage? = nil) -> [DVDMenuPage] {
         let pages = DVDMenuLayout.pages(titleCount: titles.count)
-        return pages.enumerated().map { index, range in
-            let buttons = DVDMenuLayout.buttons(titles: range, page: index, pageCount: pages.count, standard: standard)
-            return DVDMenuPage(
-                picture: png(picture(discName: discName, titles: titles, buttons: buttons, page: index, pages: pages.count, standard: standard, look: look, background: background)),
+        let scenes = DVDMenuLayout.scenePages(for: titles)
+        func page(_ kind: DVDMenuPage.Kind, _ buttons: [DVDMenuButton], heading: String?) -> DVDMenuPage {
+            DVDMenuPage(
+                kind: kind,
+                picture: png(picture(discName: discName, titles: titles, buttons: buttons, heading: heading, standard: standard, look: look, background: background)),
                 highlight: png(overlay(buttons: buttons, color: look.highlight, grow: 4, standard: standard)),
                 select: png(overlay(buttons: buttons, color: look.select, grow: 4, standard: standard)),
                 buttons: buttons)
         }
+        let main = pages.enumerated().map { index, range in
+            page(.main, DVDMenuLayout.buttons(titles: range, page: index, pageCount: pages.count, standard: standard, hasScenes: !scenes.isEmpty),
+                 heading: pages.count > 1 ? "Page \(index + 1) of \(pages.count)" : nil)
+        }
+        let scenePictures = scenes.enumerated().map { index, scene in
+            page(.scenes, DVDMenuLayout.sceneButtons(title: scene.title, chapters: scene.chapters, sceneIndex: index, sceneCount: scenes.count, standard: standard),
+                 heading: "\(titles[scene.title].name): scenes")
+        }
+        return main + scenePictures
     }
 
     // MARK: Drawing
@@ -168,7 +230,7 @@ public enum DVDMenuRenderer {
         return ctx
     }
 
-    static func picture(discName: String, titles: [DVDMenuTitle], buttons: [DVDMenuButton], page: Int, pages: Int, standard: TVStandard, look: MenuLook, background: CGImage?) -> CGImage {
+    static func picture(discName: String, titles: [DVDMenuTitle], buttons: [DVDMenuButton], heading: String?, standard: TVStandard, look: MenuLook, background: CGImage?) -> CGImage {
         let ctx = context(standard)
         let w = CGFloat(standard.width), h = CGFloat(standard.height)
         let g = look.gradient
@@ -187,8 +249,8 @@ public enum DVDMenuRenderer {
             ctx.setFillColor(CGColor(red: cover, green: cover, blue: cover, alpha: MenuLook.coverOpacity)); ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
         }
         text(ctx, discName, size: 30, bold: true, in: CGRect(x: 48, y: 44 * h / 480, width: w - 96, height: 44), align: .center, standard: standard, color: look.text)
-        if pages > 1 {
-            text(ctx, "Page \(page + 1) of \(pages)", size: 14, bold: false, in: CGRect(x: 48, y: 84 * h / 480, width: w - 96, height: 20), align: .center, standard: standard, color: look.text)
+        if let heading {
+            text(ctx, heading, size: 14, bold: false, in: CGRect(x: 48, y: 84 * h / 480, width: w - 96, height: 20), align: .center, standard: standard, color: look.text)
         }
         for button in buttons {
             let rect = CGRect(x: button.x0, y: button.y0, width: button.x1 - button.x0 + 1, height: button.y1 - button.y0 + 1)
@@ -199,6 +261,18 @@ public enum DVDMenuRenderer {
                 ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1)); ctx.fill(thumb)
                 if let image = title.thumbnail { draw(image, fitting: thumb, in: ctx) }
                 text(ctx, title.name, size: 12, bold: false, in: CGRect(x: rect.minX, y: thumb.maxY + 4, width: rect.width, height: rect.maxY - thumb.maxY - 4), align: .center, standard: standard, lines: 2, color: look.text)
+            case .chapter(let titleNumber, let chapter):
+                let title = titles[titleNumber - 1]
+                let thumb = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.width * 9 / 16)
+                ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1)); ctx.fill(thumb)
+                if title.chapterPictures.indices.contains(chapter - 1), let image = title.chapterPictures[chapter - 1] {
+                    draw(image, fitting: thumb, in: ctx)
+                }
+                let start = DVDAuthoring.chapterStarts(seconds: title.seconds)[chapter - 1]
+                text(ctx, "Chapter \(chapter) \u{00B7} \(DVDPlan.lengthText(start))", size: 12, bold: false,
+                     in: CGRect(x: rect.minX, y: thumb.maxY + 4, width: rect.width, height: rect.maxY - thumb.maxY - 4), align: .center, standard: standard, color: look.text)
+            case .scenes: label(ctx, "Scenes", rect, standard, look)
+            case .mainMenu: label(ctx, "Main Menu", rect, standard, look)
             case .playAll: label(ctx, "Play All", rect, standard, look)
             case .previous: label(ctx, "Previous", rect, standard, look)
             case .next: label(ctx, "Next", rect, standard, look)

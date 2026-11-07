@@ -76,6 +76,13 @@ The two free programs that Ripple compares to (Burn, DVDStyler) and DVD Flick al
 - **Quitting** while building, burning, or with a finished disc that is neither burned nor saved asks first. Cancel while building leaves the list as it was.
 - **Tests and snapshots** use `FixtureDVDMaker`, so no page needs ffmpeg or a drive.
 
+## What the real dvdauthor taught us (2026-11-07)
+
+- From the main menu, `jump title N` works and `jump titleset 1 title N` does not. `jump title N chapter M` is refused too, so chapter pictures live in the titleset's own menus (`<titleset><menus>`), reached with `jump titleset 1 menu entry ptt`.
+- Inside a titleset menu only `jump` works (no `call`); `jump vmgm menu 1` returns to the main menu.
+- After a video, `call menu entry ptt` returns to the first scene page. A particular page cannot be called.
+- Stand-in tools prove the order of steps, not that the real tool accepts the XML. `DVDRealBuildTests` runs everything for real when `.dvdtools` is filled.
+
 ## What cannot be promised
 
 - **Copy-protected video** (movies bought or rented from stores, streaming downloads) cannot be read. Ripple says so and does not try to get around it.

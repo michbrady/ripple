@@ -77,6 +77,8 @@ final class DVDModel: StoppableJob {
     private(set) var musicSeconds: Double = 0
     private(set) var musicProblem: String?
 
+    /// Which menu page the inspector shows (0-based; the scene pages come after the main pages).
+    var menuPage = 0
     /// Whether the Menu inspector is open.
     var showsMenu = false
 
@@ -405,9 +407,10 @@ final class DVDModel: StoppableJob {
         items = []
         phase = .editing
         buildStarted = nil
-        showsMenu = page == .videoMenu || page == .videoMenuDaylight
+        menuPage = page == .videoScenes ? 2 : 0
+        showsMenu = page == .videoMenu || page == .videoMenuDaylight || page == .videoScenes
         look = page == .videoMenuDaylight ? .daylight : .classic
-        guard page == .videoList || page == .videoOver || page == .videoMenu || page == .videoMenuDaylight || page == .videoBuilding || page == .videoFailed || page == .videoDone else { return }
+        guard page == .videoList || page == .videoOver || page == .videoMenu || page == .videoMenuDaylight || page == .videoScenes || page == .videoBuilding || page == .videoFailed || page == .videoDone else { return }
         func video(_ name: String, _ seconds: Double) -> DVDItem {
             let url = URL(fileURLWithPath: "/Movies/\(name).mp4")
             let file = VideoFile(url: url, title: VideoProbe.defaultTitle(for: url), bytes: Int(seconds * 450_000), seconds: seconds,
@@ -427,7 +430,7 @@ final class DVDModel: StoppableJob {
                                            : .failed(DVDBuildError.failed(step: "Converting \u{201C}\(name)\u{201D}", detail: "The video could not be decoded.").localizedDescription)
             return
         }
-        if page == .videoMenu || page == .videoMenuDaylight {
+        if page == .videoMenu || page == .videoMenuDaylight || page == .videoScenes {
             items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142),
                      video("Wedding", 1_800), video("Honeymoon", 1_200), video("Graduation", 900)]
             discName = "Summer Trip"
