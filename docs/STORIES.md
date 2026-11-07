@@ -567,8 +567,8 @@ UX:
 - States: none beyond the preview
 - Words: "Look", the four names
 - Access: labelled pop-up; the preview label includes the look
-Status: doing
-Note: The four looks are built, and each keeps text at 7 to 1 or better (tested).
+Status: done
+Note: The Look pop-up is in the Menu inspector and redraws the preview at once. Snapshot pages `burn-videoMenu` (Classic) and `burn-videoMenuDaylight`; the other two looks are covered by the self-test (four different menus, 7 to 1 text contrast).
 
 ### S-050 Use my own picture and music on the menu
 As the user, I choose a picture for the menu's background and a sound file to play under it.

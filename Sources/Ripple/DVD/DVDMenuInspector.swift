@@ -17,6 +17,7 @@ struct DVDMenuInspector: View {
                 preview
                 if pages.count > 1 { pager }
             }
+            if !dvd.videos.isEmpty { choices }
             Spacer(minLength: 0)
         }
         .padding(Space.lg)
@@ -29,11 +30,19 @@ struct DVDMenuInspector: View {
                 Image(nsImage: pages[page]).resizable().aspectRatio(contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(.separator))
-                    .accessibilityLabel("Menu page \(page + 1) of \(pages.count): \(dvd.cleanDiscName), \(dvd.videos.count) videos")
+                    .accessibilityLabel("Menu page \(page + 1) of \(pages.count): \(dvd.cleanDiscName), \(dvd.look.title) look, \(dvd.videos.count) videos")
             } else {
                 Rectangle().fill(.quaternary).aspectRatio(4.0 / 3, contentMode: .fit)
             }
         }
+    }
+
+    private var choices: some View {
+        @Bindable var dvd = dvd
+        return Picker("Look", selection: $dvd.look) {
+            ForEach(MenuLook.allCases) { Text($0.title).tag($0) }
+        }
+        .help("The colors of the menu")
     }
 
     private var pager: some View {
@@ -57,7 +66,7 @@ struct DVDMenuInspector: View {
         let titles = dvd.items.compactMap { item -> String? in
             if case .ready(let file) = item.state { return "\(file.title)|\(item.picture != nil)" } else { return nil }
         }
-        return "\(dvd.cleanDiscName)#\(dvd.standard.rawValue)#\(titles.joined(separator: "#"))"
+        return "\(dvd.cleanDiscName)#\(dvd.standard.rawValue)#\(dvd.look.rawValue)#\(titles.joined(separator: "#"))"
     }
 
     /// Draws the pages. Nothing is converted: this is Ripple's own drawing.
@@ -66,7 +75,7 @@ struct DVDMenuInspector: View {
             if case .ready(let file) = item.state { DVDMenuTitle(name: file.title, thumbnail: item.picture) } else { nil }
         }
         guard !titles.isEmpty else { pages = []; return }
-        let drawn = DVDMenuRenderer.render(discName: dvd.cleanDiscName, titles: titles, standard: dvd.standard)
+        let drawn = DVDMenuRenderer.render(discName: dvd.cleanDiscName, titles: titles, standard: dvd.standard, look: dvd.look)
         pages = drawn.compactMap { NSImage(data: $0.picture) }
         page = min(page, max(0, pages.count - 1))
     }

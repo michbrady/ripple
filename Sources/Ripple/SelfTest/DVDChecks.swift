@@ -134,6 +134,9 @@ extension SelfTest {
             let size = pages.first.flatMap { NSImage(data: $0.picture) }.map { ($0.representations.first?.pixelsWide ?? 0, $0.representations.first?.pixelsHigh ?? 0) }
             check("the menu is drawn at \(standard.width)x\(standard.height) (\(standard.title))", size?.0 == standard.width && size?.1 == standard.height, "\(String(describing: size))")
         }
+        let pictures = MenuLook.allCases.map { look in DVDMenuRenderer.render(discName: "Look", titles: titles, standard: .ntsc, look: look)[0].picture }
+        check("each of the four looks draws its own menu", Set(pictures).count == 4 && MenuLook.allCases.map(\.title) == ["Classic", "Midnight", "Daylight", "Warm"])
+        check("every look keeps its text readable (7 to 1)", MenuLook.allCases.allSatisfy { $0.textContrast >= 7 })
         check("the disc name is cut to 32 characters", { dvd.discName = String(repeating: "a", count: 50); return dvd.cleanDiscName.count == 32 }())
         dvd.showSnapshot(.empty)
     }

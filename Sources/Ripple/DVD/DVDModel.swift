@@ -44,6 +44,8 @@ final class DVDModel: StoppableJob {
 
     /// The name at the top of the menu and on the disc.
     var discName = "My Videos"
+    /// The menu's look.
+    var look: MenuLook = .classic
     /// Whether the Menu inspector is open.
     var showsMenu = false
 
@@ -204,8 +206,9 @@ final class DVDModel: StoppableJob {
     func showSnapshot(_ page: BurnSnapshotPage) {
         skipped = 0
         items = []
-        showsMenu = page == .videoMenu
-        guard page == .videoList || page == .videoOver || page == .videoMenu else { return }
+        showsMenu = page == .videoMenu || page == .videoMenuDaylight
+        look = page == .videoMenuDaylight ? .daylight : .classic
+        guard page == .videoList || page == .videoOver || page == .videoMenu || page == .videoMenuDaylight else { return }
         func video(_ name: String, _ seconds: Double) -> DVDItem {
             let url = URL(fileURLWithPath: "/Movies/\(name).mp4")
             let file = VideoFile(url: url, title: VideoProbe.defaultTitle(for: url), bytes: Int(seconds * 450_000), seconds: seconds,
@@ -213,7 +216,7 @@ final class DVDModel: StoppableJob {
             return DVDItem(url: url, state: .ready(file), picture: FixtureVideoSource.gradient(seed: abs(name.hashValue)))
         }
         items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142)]
-        if page == .videoMenu {
+        if page == .videoMenu || page == .videoMenuDaylight {
             items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142),
                      video("Wedding", 1_800), video("Honeymoon", 1_200), video("Graduation", 900)]
             discName = "Summer Trip"
