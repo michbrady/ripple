@@ -36,6 +36,39 @@ Both programs are GPL. They would ship as separate programs inside the app (Cont
 - Quality bands for the capacity bar: 5,000 kbit/s or more Excellent (up to about 1 h 50 min on one layer), 3,500 or more Good (about 2 h 40), 2,500 or more Reduced (about 3 h 40), under that Too long.
 - Menu pages hold 6 titles. Chapters every 5 minutes inside each title.
 
+## How other DVD makers do menus (reviewed 2026-11-06)
+
+Read from public pages, not by running the programs.
+
+| Program | Engine | Menus |
+| --- | --- | --- |
+| DVDStyler (open source) | dvdauthor | 20+ templates, an imported background picture, text buttons and buttons from SVG files, objects placed anywhere, chapters per title, a post command per title, NTSC and PAL |
+| Burn (open source, Mac) | ffmpeg, dvdauthor, spumux, mkisofs | A handful of simple preset themes, minimal customizing: made for quick discs |
+| Roxio Toast (Mac, paid) | its own | 20+ themed templates, 100+ in Pro, motion menus, submenus, chapter links, a Template Designer, your own background, buttons, and music |
+| Apple iDVD (gone since 2011) | its own | 150+ themes, each with a main, chapters, and extras menu; drop zones for your photos and clips; motion menus (a 15-minute budget); scene-selection menus; auto-fill |
+| Wondershare DVD Creator (paid) | its own | 40+ static and moving templates, a background and music of your choice, chapter thumbnails, automatic or manual chapters |
+| DVD Flick (Windows) | dvdauthor | Simple menus, little customizing, no preview |
+
+What they share, in order of how common it is:
+1. **A theme.** One look chosen from a short list, applied to every menu page. The user customizes a little, not everything.
+2. **A main menu with a button per title, and a scene menu with chapter pictures** for a title that has chapters.
+3. **Your own background** picture, and often **your own music** that loops under the menu.
+4. **Moving menus**: a video loop behind the buttons. The paid programs have it; the free ones mostly do not.
+5. **A preview** before burning, and **automatic chapters**.
+
+The two free programs that Ripple compares to (Burn, DVDStyler) and DVD Flick all use dvdauthor and spumux, as planned here, so the engine is the usual one.
+
+### What Ripple takes in version one
+- **Themes**: four built-in looks (Classic, Midnight, Daylight, Warm), drawn in Swift, with colors that keep the text readable. No template editor.
+- **Your own background picture** for the menu, with a darkening layer so the buttons stay readable.
+- **Menu music**: a song or sound file loops under the menu (up to 90 seconds are used, then it repeats).
+- **Scene menus**: a title with chapters gets a page of chapter pictures, reached by a button beside the title.
+- **A preview** of every menu page in the window before anything is converted (Ripple draws the menu itself, so this is free).
+- Automatic chapters every 5 minutes, as already planned.
+
+### What waits
+- Moving menus (a video loop behind the buttons), your own button shapes, and a template designer. They are the largest part of the other programs' work and the part most likely to go wrong on a real player.
+
 ## What cannot be promised
 
 - **Copy-protected video** (movies bought or rented from stores, streaming downloads) cannot be read. Ripple says so and does not try to get around it.

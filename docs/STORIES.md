@@ -510,6 +510,46 @@ Acceptance:
 - [self] The menu pictures are drawn at 720x480 (NTSC) or 720x576 (PAL) and the highlight pictures use only four colors.
 - [snap] 11-dvd-menu shows the first menu page as the disc will show it.
 - [manual] A DVD player shows the menu, moves between buttons with the arrow keys, and plays the chosen title.
+Status: doing
+Note: the layout, drawing, and overlay rules are built and tested (DVDMenuTests). The player check is not yet possible here.
+
+### S-049 Choose a menu look
+As the user, I pick one of four looks for the menu: Classic, Midnight, Daylight, or Warm.
+Screens: 11-dvd-menu
+Depends: S-044
+Acceptance:
+- [unit] Each look has a background, a text color, and a highlight color; the text keeps a contrast of at least 7 to 1 against its background.
+- [snap] 11-dvd-menu shows each look.
+Status: todo
+
+### S-050 Use my own picture and music on the menu
+As the user, I choose a picture for the menu's background and a sound file to play under it.
+Screens: 11-dvd-menu
+Depends: S-049
+Acceptance:
+- [unit] A picture is cropped to fill the menu and darkened so white text keeps a contrast of at least 7 to 1.
+- [unit] The music is cut to 90 seconds at most; a shorter file is used whole; the menu's length matches it.
+- [self] A picture or sound file that cannot be read is named and the built-in background and silence are used instead.
+Status: todo
+
+### S-051 Scene menus
+As the user, a title with chapters has a page of chapter pictures, and each picture plays from that chapter.
+Screens: 11-dvd-scenes
+Depends: S-045
+Acceptance:
+- [unit] Chapters are every 5 minutes; a title under 10 minutes has none and gets no scene button.
+- [unit] A scene page holds 6 chapters; more get Next and Previous.
+- [self] The dvdauthor description jumps to the right chapter of the right title from each picture.
+- [manual] A DVD player plays from the chosen chapter and returns to the scene page.
+Status: todo
+
+### S-052 Preview the menu
+As the user, I see every menu page in the window before anything is converted.
+Screens: 11-dvd-preview
+Depends: S-044
+Acceptance:
+- [snap] 11-dvd-preview shows the pages with their buttons, and updates when I rename a title, change the look, or choose a picture.
+- [self] Opening the preview converts nothing.
 Status: todo
 
 ### S-045 Build the disc
