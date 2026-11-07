@@ -41,3 +41,6 @@ Native, with the system accent color, so it reads as a built-in Mac app. Cover a
 - A file-name template editor, batch library tools, and re-tagging existing files.
 - Sync, accounts, and multi-drive ripping.
 - CD-Text, gapless burn tuning, and burning M4A files.
+
+## Added later: Video DVD
+The user wants to drop in video files (.mov, .mp4, .avi, and others) and burn a proper DVD-Video disc with a menu that Ripple makes by itself. Plan, tools, and limits: `docs/DVD-DESIGN.md`. Stories: M7 in `docs/STORIES.md`.

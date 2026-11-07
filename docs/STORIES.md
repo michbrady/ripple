@@ -448,6 +448,111 @@ Acceptance:
 Status: done
 Note: Ripple is free. The web page carries a Ko-fi tip link and a privacy and terms page that says what the app sends (a disc lookup to MusicBrainz, the Cover Art Archive, and Apple's iTunes Search) and what it keeps (nothing but settings on the Mac). The Help menu and About window also link to the Ko-fi tip page; the app never asks for a tip on its own. The privacy page's contact is BradysBit's Ko-fi page.
 
+## M7 Video DVD
+Ends with an app that turns a handful of video files into a DVD with a menu and burns it. Design, risks, and what cannot be checked here: `docs/DVD-DESIGN.md`. Each story still needs its `UX:` block before it is built.
+
+### S-039 Choose Video DVD
+As the user, I pick Video DVD as the kind of disc to burn, next to Audio CD and MP3 Disc.
+Screens: 11-dvd-empty
+Depends: S-031
+Acceptance:
+- [unit] `DiscType` has a third case, Video DVD, with a title and a one-line summary.
+- [snap] 11-dvd-empty shows the switch with three choices and an empty list that says "Drop video files here, or choose a folder."
+- [self] The choice is remembered, and the window asks for a blank DVD-R or DVD-RW, not a CD.
+Status: todo
+
+### S-040 Add video files
+As the user, I add video files by dropping them, or by choosing files, and see each with its length and size.
+Screens: 11-dvd-list
+Depends: S-039
+Acceptance:
+- [unit] .mov, .mp4, .m4v, .avi, .mkv, .wmv, .mpg, .webm, and .flv are accepted; other files are skipped with a count.
+- [unit] ffmpeg's report of a file becomes length, size, frame rate, picture size, and whether it has audio.
+- [self] A file that cannot be read says so on its row. A copy-protected file says "This video is copy-protected, so Ripple cannot read it."
+- [snap] 11-dvd-list shows rows with a picture from the video, a title, the length, and a state.
+Status: todo
+
+### S-041 Order, name, and remove titles
+As the user, I put the videos in order, change each title's name, and remove ones I do not want.
+Screens: 11-dvd-list
+Depends: S-040
+Acceptance:
+- [unit] A title's name starts as the file's name without its ending and underscores, and is made safe for the menu (length cut, no line breaks).
+- [self] Move Up, Move Down, drag to reorder, rename, remove, and Undo all work.
+Status: todo
+
+### S-042 See if it fits, and how good it will look
+As the user, I see a bar for the disc and a word for the picture quality, and I am told when there is too much.
+Screens: 11-dvd-list
+Depends: S-040
+Acceptance:
+- [unit] The plan gives each title the same bit rate from what is left after audio and menus, capped at 9,000 kbit/s; the bands are Excellent, Good, Reduced, and Too long.
+- [unit] A dual-layer disc in the drive raises the capacity.
+- [snap] The bar shows used space and the quality word. Too long shows what to remove, in minutes.
+Status: todo
+
+### S-043 TV standard and screen shape
+As the user, the disc is made for my TV: NTSC by default, PAL when my videos are PAL, widescreen or standard per video.
+Screens: 11-dvd-list
+Depends: S-040
+Acceptance:
+- [unit] 25 and 50 frames a second suggest PAL; 23.976, 24, 29.97, and 30 suggest NTSC. Mixed videos use the first one and say so.
+- [unit] A 16:9 source stays 16:9; a 4:3 source gets bars at the sides; other shapes get bars on the sides or the top to fit without stretching.
+- [self] A choice in the window overrides the suggestion.
+Status: todo
+
+### S-044 Make the menu
+As the user, Ripple draws a menu for the disc: its name, a button for each title with a picture, and Play All.
+Screens: 11-dvd-menu
+Depends: S-041
+Acceptance:
+- [unit] 6 titles fit on a page; more get Next and Previous buttons; every page has the same disc name.
+- [self] The menu pictures are drawn at 720x480 (NTSC) or 720x576 (PAL) and the highlight pictures use only four colors.
+- [snap] 11-dvd-menu shows the first menu page as the disc will show it.
+- [manual] A DVD player shows the menu, moves between buttons with the arrow keys, and plays the chosen title.
+Status: todo
+
+### S-045 Build the disc
+As the user, I press Build and Ripple converts the videos, makes the menu, and prepares the disc, with a bar and a Cancel button.
+Screens: 11-dvd-building
+Depends: S-042, S-043, S-044
+Acceptance:
+- [unit] The conversion command for a title carries the right standard, shape, bit rate, audio, and a keyframe every half second.
+- [unit] The dvdauthor description lists the menu, each title with chapters every 5 minutes, and a button for each title.
+- [self] With stand-in tools, every step runs in order, reports progress, and Cancel stops the running program and removes the work folder.
+- [self] Not enough free space for the work folder is said before anything starts.
+- [self] A short real test video makes a VIDEO_TS folder that dvdauthor's own reader reads back with the right number of titles and chapters.
+Status: todo
+
+### S-046 Make a disc image
+As the user, I can stop before burning and save the disc as an image (.iso) that opens in a DVD player app.
+Screens: 11-dvd-done
+Depends: S-045
+Acceptance:
+- [self] The image mounts with VIDEO_TS and AUDIO_TS in it, and the volume name is the disc's name.
+- [self] Save Disc Image needs no drive and no blank disc.
+Status: todo
+
+### S-047 Burn the Video DVD
+As the user, I put in a blank DVD-R or DVD-RW and burn the disc.
+Screens: 11-dvd-burning
+Depends: S-046, S-030
+Acceptance:
+- [unit] `DiscBurner` has a method that burns an image file; the fixture burner records it.
+- [self] A disc that is too small, not blank, or a CD is refused with the usual messages; Cancel stops the burn.
+- [manual] The disc burns, verifies, ejects, and plays in a DVD player with the menu working.
+Status: todo
+
+### S-048 Carry the tools
+As the user, I install Ripple and the DVD feature just works.
+Depends: S-045
+Acceptance:
+- [self] `tools/build-dvdauthor.sh` builds dvdauthor and spumux without libdvdcss; `./build.sh` puts them and ffmpeg in Contents/Resources/bin, signed with the hardened runtime and a timestamp.
+- [self] The signed app finds all three tools and each runs.
+- [self] The About window and the web page credit ffmpeg and dvdauthor, give their licences, and say where to get the source.
+- [manual] `tools/release.sh` notarizes with the tools inside.
+Status: todo
+
 ## Dropped
 - Accounts, sync, sharing, and teams: Ripple has one user and no server.
 - A file-name template editor: the default `Artist/Album/01 - Title` handles multi-disc and compilations.

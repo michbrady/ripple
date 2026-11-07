@@ -27,3 +27,10 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | Eject | Push the disc out of the drive | Remove, Unmount |
 | Cancel | Stop a rip or a burn before it finishes | Abort, Stop |
 | BradysBit | The brand that makes Ripple. Shown in the About window and the copyright line, not in the window title | publisher, company |
+| Video DVD | A burned disc in the standard DVD-Video format with a menu: it plays in any DVD player | movie disc, DVD movie, data DVD |
+| Title (on a Video DVD) | One video on the disc, with a button in the menu | movie, clip, file |
+| Menu | The screen a Video DVD opens on, with a button for each title | home screen, index |
+| Chapter | A point inside a title that the player's Next button jumps to | scene, marker |
+| TV Standard | NTSC (US) or PAL (Europe): how many lines and frames a second the disc is made for | region, format |
+| Disc Image | A single .iso file that holds a whole Video DVD, for later burning or for a DVD player app | ISO, backup |
+
