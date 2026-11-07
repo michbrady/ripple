@@ -60,3 +60,35 @@ final class DVDRealBuildTests: XCTestCase {
 private extension VideoFile {
     func titled(_ name: String) -> VideoFile { var copy = self; copy.title = name; return copy }
 }
+
+/// Each common container, made by the real ffmpeg, is read by `VideoProbe` and converted to DVD video by the real command.
+final class DVDRealFormatTests: XCTestCase {
+    func testEveryCommonVideoFormatReadsAndConverts() async throws {
+        guard let ffmpeg = DVDTestTools.ffmpeg else { throw XCTSkip("no ffmpeg in .dvdtools") }
+        let folder = try DVDTestTools.tempFolder("ripple-formats")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        // (ending, video codec, audio codec): what each container usually holds.
+        let formats: [(String, String, String)] = [
+            ("mov", "mpeg4", "aac"), ("mp4", "mpeg4", "aac"), ("m4v", "mpeg4", "aac"), ("avi", "mpeg4", "mp3"), ("mkv", "mpeg4", "aac"),
+            ("wmv", "wmv2", "wmav2"), ("mpg", "mpeg2video", "mp2"), ("mpeg", "mpeg1video", "mp2"), ("webm", "libvpx", "libvorbis"),
+            ("flv", "flv", "aac"), ("ts", "mpeg2video", "mp2"), ("3gp", "h263", "aac"),
+        ]
+        var worked: [String] = [], skipped: [String] = [], failed: [String] = []
+        for (ending, video, audio) in formats {
+            let source = folder.appending(path: "sample.\(ending)")
+            let size = video == "h263" ? "352x288" : "640x360"
+            let made = try await ProcessRunner.run(ffmpeg, ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=duration=3:size=\(size):rate=25",
+                                                            "-f", "lavfi", "-i", "sine=frequency=440:duration=3", "-c:v", video, "-c:a", audio, source.path])
+            guard made.status == 0 else { skipped.append(ending); continue }   // this ffmpeg cannot make that kind of file
+            guard VideoProbe.isVideoFile(source), case .success(let file) = try await VideoProbe.read(source, ffmpeg: ffmpeg) else { failed.append("\(ending): not read"); continue }
+            let out = folder.appending(path: "out-\(ending).mpg")
+            let geometry = DVDGeometry.fit(displayAspect: file.displayAspect, widescreen: file.isWidescreen, standard: .ntsc)
+            let converted = try await ProcessRunner.run(ffmpeg, DVDAuthoring.convertArguments(input: source, output: out, geometry: geometry, standard: .ntsc, videoKbps: 5_000, hasAudio: file.hasAudio))
+            let bytes = (try? out.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            if converted.status == 0 && bytes > 10_000 { worked.append(ending) } else { failed.append("\(ending): \(converted.error.suffix(120))") }
+        }
+        print("DVD formats converted: \(worked.joined(separator: ", ")). Not made by this ffmpeg: \(skipped.joined(separator: ", ")).")
+        XCTAssertTrue(failed.isEmpty, failed.joined(separator: "\n"))
+        for ending in ["mov", "mp4", "avi", "mkv", "mpg"] { XCTAssertTrue(worked.contains(ending), "\(ending) must work") }
+    }
+}

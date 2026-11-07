@@ -484,7 +484,7 @@ UX:
 - Words: "Choose Videos…", tooltip on + "Add videos to the disc (⌘O)"; row length "1:42:10", size "1.2 GB"
 - Access: rows are focusable; VoiceOver reads "Summer Trip, 1 hour 42 minutes, 1.2 gigabytes"; a problem is an icon and words, not only color
 Status: done
-Note: Rows read through a `VideoSource` (ffmpeg live; made-up files for snapshots and the self-test). Snapshot page: `burn-videoList`. The app finds ffmpeg in Contents/Resources/bin, or at the path in RIPPLE_FFMPEG until S-048 carries it. Not yet tried by hand with real files in the window: dropping a folder, and a real copy-protected movie.
+Note: Rows read through a `VideoSource` (ffmpeg live; made-up files for snapshots and the self-test). Snapshot page: `burn-videoList`. The app finds ffmpeg in Contents/Resources/bin, or at the path in RIPPLE_FFMPEG until S-048 carries it. Not yet tried by hand with real files in the window: dropping a folder, and a real copy-protected movie. Every common ending (mov, mp4, m4v, avi, mkv, wmv, mpg, mpeg, webm, flv, ts, 3gp) was made by the real ffmpeg, read, and converted to DVD video (DVDRealFormatTests). Which codecs a given file holds is up to ffmpeg; a file it cannot read says so on its row.
 
 ### S-041 Order, name, and remove titles
 As the user, I put the videos in order, change each title's name, and remove ones I do not want.
