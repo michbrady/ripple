@@ -52,7 +52,7 @@ struct DVDBar: View {
 
     /// A Blu-ray is made in one HD shape, chosen from the first video; there is nothing to pick.
     private var pictureNote: some View {
-        Label("The disc is made in \(dvd.bluRayMode.title) high definition, from the first video. It plays at once, with no menu.", systemImage: "info.circle")
+        Label("The disc is made in \(dvd.bluRayMode.title) high definition, from the first video. It plays at once, with no menu, and each video is also a title that players with a title list can pick.", systemImage: "info.circle")
             .font(.callout).foregroundStyle(.secondary)
     }
 

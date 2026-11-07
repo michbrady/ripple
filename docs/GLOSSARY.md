@@ -41,3 +41,4 @@ One name per thing. Buttons, menus, titles, tooltips, and errors use these words
 | Disc Name | The name shown at the top of the Menu and as the disc's volume name | label, volume name |
 | Blu-ray Disc | A disc of videos in high definition that plays at once in any Blu-ray player, with no menu. The fourth Disc Type | BD, HD DVD |
 | Chapter (Blu-ray) | The start of each video on a Blu-ray Disc; the remote's Next button skips to it | scene, track |
+| Title (Blu-ray) | One thing a Blu-ray player can start: the one that plays everything, then one for each video. Players that list titles show them | menu, track |

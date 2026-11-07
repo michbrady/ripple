@@ -780,3 +780,13 @@ Depends: S-054
 Acceptance:
 - [self] `tools/fetch-tsmuxer.sh` checks a known checksum; `build.sh` bundles and signs it; the About window and `DVD-TOOLS-NOTICE.txt` credit it, with the Apache licence text.
 Status: done
+
+### S-057 A title for each video on a Blu-ray
+As the user, on a player that lists a disc's titles, I can pick one video instead of playing everything.
+Depends: S-054
+Acceptance:
+- [unit] From tsMuxeR's own `index.bdmv`, `MovieObject.bdmv`, and playlist, the code writes one playlist per video (the same stream, a different start and end), one title for each, and chapters at the true start of each video (`BluRayTitlesTests`). A file that is not tsMuxeR's is refused, never guessed at.
+- [unit] With the real tools, libbluray (`bd_info`, `bd_list_titles`, installed by `brew install libbluray`) reads the finished image and lists three titles (everything: 2 chapters; each video: its own length), with First Play and the top menu supported (`BluRayRealBuildTests`; skipped when libbluray is not installed).
+- [manual] A Blu-ray player shows or lets you pick the titles. How a player shows them is up to the player.
+Status: doing
+Note: One video keeps tsMuxeR's own image. Two or more are written as a folder, patched, and made into a UDF 2.5 image with `hdiutil makehybrid -udf-version 2.50`, which libbluray reads but no real player has yet. The title that plays everything is first, so the disc still plays through on load, with Next skipping between videos.

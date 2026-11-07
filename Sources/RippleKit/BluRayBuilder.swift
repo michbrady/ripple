@@ -4,7 +4,8 @@ import Foundation
 public struct BluRayTools: Sendable {
     public var ffmpeg: URL
     public var tsmuxer: URL
-    public init(ffmpeg: URL, tsmuxer: URL) { self.ffmpeg = ffmpeg; self.tsmuxer = tsmuxer }
+    public var hdiutil: URL
+    public init(ffmpeg: URL, tsmuxer: URL, hdiutil: URL = URL(fileURLWithPath: "/usr/bin/hdiutil")) { self.ffmpeg = ffmpeg; self.tsmuxer = tsmuxer; self.hdiutil = hdiutil }
 }
 
 /// Makes a Blu-ray disc image: ffmpeg converts every video to HD picture and AC-3 sound, and tsMuxeR joins them into one program
@@ -29,7 +30,7 @@ public struct BluRayBuilder: DVDMaker {
             let plan = project.plan
 
             // 1. Convert every video. This is the slow part.
-            var converted: [String] = []
+            var converted: [String] = [], lengths: [Double] = []
             for (index, file) in project.files.enumerated() {
                 let number = index + 1
                 let name = "title\(number).mkv"
@@ -45,18 +46,40 @@ public struct BluRayBuilder: DVDMaker {
                 }
                 guard r.status == 0 else { throw DVDBuildError.failed(step: "Converting \u{201C}\(file.title)\u{201D}", detail: DVDBuilder.tail(r.error)) }
                 converted.append(name)
+                // The converted file's own length, not the original's: the chapters and titles must start where each video really does.
+                let probe = try await ProcessRunner.run(tools.ffmpeg, ["-hide_banner", "-i", work.appending(path: name).path])
+                lengths.append(VideoProbe.seconds(in: probe.error + probe.output) ?? seconds)
             }
 
             // 2. Join them into one program and write the disc image.
             report(.authoring)
             let label = DVDName.volumeLabel(project.discName)
-            let meta = BluRayAuthoring.metaFile(files: converted, seconds: project.files.map(\.seconds), mode: mode, label: label)
+            let meta = BluRayAuthoring.metaFile(files: converted, seconds: lengths, mode: mode, label: label)
             try meta.write(to: work.appending(path: "disc.meta"), atomically: true, encoding: .utf8)
             report(.imaging)
             let image = work.appending(path: "disc.iso")
-            let made = try await ProcessRunner.run(tools.tsmuxer, ["disc.meta", "disc.iso"], directory: work)
-            guard made.status == 0, fm.fileExists(atPath: image.path) else {
-                throw DVDBuildError.failed(step: "Making the disc image", detail: DVDBuilder.tail(made.error + made.output))
+            if converted.count == 1 {
+                // One video: tsMuxeR's own image, as it is.
+                let made = try await ProcessRunner.run(tools.tsmuxer, ["disc.meta", "disc.iso"], directory: work)
+                guard made.status == 0, fm.fileExists(atPath: image.path) else {
+                    throw DVDBuildError.failed(step: "Making the disc image", detail: DVDBuilder.tail(made.error + made.output))
+                }
+            } else {
+                // Several videos: tsMuxeR writes the disc as a folder, a title is added for each video, and the folder becomes a UDF 2.5 image.
+                let disc = work.appending(path: "disc")
+                let made = try await ProcessRunner.run(tools.tsmuxer, ["disc.meta", "disc"], directory: work)
+                guard made.status == 0, fm.fileExists(atPath: disc.appending(path: "BDMV/index.bdmv").path) else {
+                    throw DVDBuildError.failed(step: "Making the disc files", detail: DVDBuilder.tail(made.error + made.output))
+                }
+                do { try BluRayTitles.addTitles(to: disc, lengths: lengths) } catch {
+                    throw DVDBuildError.failed(step: "Adding a title for each video", detail: "The disc files were not in the expected form.")
+                }
+                let imaged = try await ProcessRunner.run(tools.hdiutil, ["makehybrid", "-udf", "-udf-version", "2.50", "-default-volume-name", label,
+                                                                          "-udf-volume-name", label, "-o", image.path, disc.path])
+                guard imaged.status == 0, fm.fileExists(atPath: image.path) else {
+                    throw DVDBuildError.failed(step: "Making the disc image", detail: DVDBuilder.tail(imaged.error + imaged.output))
+                }
+                try? fm.removeItem(at: disc)
             }
             for name in converted + ["disc.meta"] { try? fm.removeItem(at: work.appending(path: name)) }
             report(.done)
