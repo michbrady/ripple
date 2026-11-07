@@ -584,8 +584,8 @@ UX:
 - States: unreadable "Ripple cannot read “name”. The built-in background is used."; a music file over 90 seconds shows "Plays the first 1:30, then repeats."; none chosen shows "Built-in background" and "No music"
 - Words: "Background", "Music", "Choose Picture…", "Choose Music…", "Remove"
 - Access: both buttons are in the tab order; the chosen file name is read after the label
-Status: doing
-Note: Background picture (cropped and covered, 7 to 1 worst case, tested) and music (length 5 to 90 seconds, tested with a stand-in) are in the pipeline. The choosers in the window are not built yet.
+Status: done
+Note: Background and Music rows are in the Menu inspector, each with a chooser, a Remove button, and a named problem when a file cannot be read. The picture is covered and cropped by the renderer (tested earlier); music is capped at 90 seconds by the builder. Not yet tried by hand with a real picture and song. The self-test uses a made-up PNG and WAV.
 
 ### S-051 Scene menus
 As the user, a title with chapters has a page of chapter pictures, and each picture plays from that chapter.

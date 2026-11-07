@@ -1,5 +1,8 @@
 import AppKit
+import AVFoundation
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 import Observation
 import RippleKit
 
@@ -46,6 +49,14 @@ final class DVDModel: StoppableJob {
     var discName = "My Videos"
     /// The menu's look.
     var look: MenuLook = .classic
+    /// The user's own menu picture and music. A file that cannot be read leaves these empty and sets a problem.
+    private(set) var backgroundURL: URL?
+    private(set) var backgroundImage: CGImage?
+    private(set) var backgroundProblem: String?
+    private(set) var musicURL: URL?
+    private(set) var musicSeconds: Double = 0
+    private(set) var musicProblem: String?
+
     /// Whether the Menu inspector is open.
     var showsMenu = false
 
@@ -141,6 +152,57 @@ final class DVDModel: StoppableJob {
         urls.forEach(visit)
         return (videos, skipped)
     }
+
+    // MARK: Menu picture and music
+
+    /// The longest stretch of music the menu uses; a longer file plays this much, then repeats.
+    static let maxMenuMusic = 90.0
+
+    func chooseBackground() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.message = "Choose a picture for the menu's background"
+        panel.prompt = "Choose"
+        panel.directoryURL = URL.picturesDirectory
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        setBackground(url)
+    }
+
+    func chooseMusic() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio]
+        panel.message = "Choose music to play under the menu"
+        panel.prompt = "Choose"
+        panel.directoryURL = URL.musicDirectory
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task { await setMusic(url) }
+    }
+
+    func setBackground(_ url: URL) {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
+            backgroundProblem = "Ripple cannot read \u{201C}\(url.lastPathComponent)\u{201D}. The built-in background is used."
+            return
+        }
+        backgroundURL = url
+        backgroundImage = image
+        backgroundProblem = nil
+    }
+
+    func setMusic(_ url: URL) async {
+        let asset = AVURLAsset(url: url)
+        let seconds = (try? await asset.load(.duration).seconds) ?? 0
+        guard seconds.isFinite, seconds > 0, ((try? await asset.load(.tracks).contains { $0.mediaType == .audio }) ?? false) else {
+            musicProblem = "Ripple cannot read \u{201C}\(url.lastPathComponent)\u{201D}. The menu is silent."
+            return
+        }
+        musicURL = url
+        musicSeconds = seconds
+        musicProblem = nil
+    }
+
+    func removeBackground() { backgroundURL = nil; backgroundImage = nil; backgroundProblem = nil }
+    func removeMusic() { musicURL = nil; musicSeconds = 0; musicProblem = nil }
 
     // MARK: Order, names, and removing
 

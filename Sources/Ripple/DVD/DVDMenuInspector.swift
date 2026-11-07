@@ -39,10 +39,37 @@ struct DVDMenuInspector: View {
 
     private var choices: some View {
         @Bindable var dvd = dvd
-        return Picker("Look", selection: $dvd.look) {
-            ForEach(MenuLook.allCases) { Text($0.title).tag($0) }
+        return VStack(alignment: .leading, spacing: Space.md) {
+            Picker("Look", selection: $dvd.look) {
+                ForEach(MenuLook.allCases) { Text($0.title).tag($0) }
+            }
+            .help("The colors of the menu")
+            fileChoice("Background", name: dvd.backgroundURL?.lastPathComponent, empty: "Built-in background", problem: dvd.backgroundProblem,
+                       choose: "Choose Picture\u{2026}", help: "Choose a picture for the menu's background",
+                       choosing: { dvd.chooseBackground() }, remove: { dvd.removeBackground() })
+            fileChoice("Music", name: dvd.musicURL?.lastPathComponent, empty: "No music", problem: dvd.musicProblem,
+                       note: dvd.musicSeconds > DVDModel.maxMenuMusic ? "Plays the first 1:30, then repeats." : nil,
+                       choose: "Choose Music\u{2026}", help: "Choose music to play under the menu",
+                       choosing: { dvd.chooseMusic() }, remove: { dvd.removeMusic() })
         }
-        .help("The colors of the menu")
+    }
+
+    private func fileChoice(_ label: String, name: String?, empty: String, problem: String?, note: String? = nil, choose: String, help: String,
+                            choosing: @escaping () -> Void, remove: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            HStack {
+                Text(label)
+                Spacer()
+                Text(name ?? empty).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            }
+            HStack {
+                Button(choose, action: choosing).help(help)
+                if name != nil { Button("Remove", action: remove) }
+            }
+            if let problem { Label(problem, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(Surface.warning) }
+            if let note { Label(note, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary) }
+        }
+        .accessibilityElement(children: .contain)
     }
 
     private var pager: some View {
@@ -66,7 +93,7 @@ struct DVDMenuInspector: View {
         let titles = dvd.items.compactMap { item -> String? in
             if case .ready(let file) = item.state { return "\(file.title)|\(item.picture != nil)" } else { return nil }
         }
-        return "\(dvd.cleanDiscName)#\(dvd.standard.rawValue)#\(dvd.look.rawValue)#\(titles.joined(separator: "#"))"
+        return "\(dvd.cleanDiscName)#\(dvd.standard.rawValue)#\(dvd.look.rawValue)#\(dvd.backgroundURL?.path ?? "")#\(titles.joined(separator: "#"))"
     }
 
     /// Draws the pages. Nothing is converted: this is Ripple's own drawing.
@@ -75,7 +102,7 @@ struct DVDMenuInspector: View {
             if case .ready(let file) = item.state { DVDMenuTitle(name: file.title, thumbnail: item.picture) } else { nil }
         }
         guard !titles.isEmpty else { pages = []; return }
-        let drawn = DVDMenuRenderer.render(discName: dvd.cleanDiscName, titles: titles, standard: dvd.standard, look: dvd.look)
+        let drawn = DVDMenuRenderer.render(discName: dvd.cleanDiscName, titles: titles, standard: dvd.standard, look: dvd.look, background: dvd.backgroundImage)
         pages = drawn.compactMap { NSImage(data: $0.picture) }
         page = min(page, max(0, pages.count - 1))
     }

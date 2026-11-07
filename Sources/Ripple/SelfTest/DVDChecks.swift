@@ -20,6 +20,7 @@ extension SelfTest {
         fitChecks(burn: burn, dvd: dvd)
         await standardChecks()
         menuChecks(dvd: dvd)
+        await menuMediaChecks()
     }
 
     /// S-040: dropped files and folders become rows; other files are counted and skipped; bad videos say why.
@@ -139,5 +140,52 @@ extension SelfTest {
         check("every look keeps its text readable (7 to 1)", MenuLook.allCases.allSatisfy { $0.textContrast >= 7 })
         check("the disc name is cut to 32 characters", { dvd.discName = String(repeating: "a", count: 50); return dvd.cleanDiscName.count == 32 }())
         dvd.showSnapshot(.empty)
+    }
+
+    /// S-050: the user's own picture and music, and a graceful fallback for a file that cannot be read.
+    private static func menuMediaChecks() async {
+        let fm = FileManager.default
+        let folder = fm.temporaryDirectory.appending(path: "ripple-media-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: folder) }
+        let picture = folder.appending(path: "beach.png")
+        try? DVDMenuRenderer.blank(standard: .ntsc).write(to: picture)
+        let notAPicture = folder.appending(path: "notes.png")
+        try? Data("not a picture".utf8).write(to: notAPicture)
+        let music = folder.appending(path: "tune.wav")
+        try? wave(seconds: 2).write(to: music)
+        let notMusic = folder.appending(path: "tune.mp3")
+        try? Data("not music".utf8).write(to: notMusic)
+
+        let dvd = DVDModel(source: FixtureVideoSource())
+        dvd.setBackground(picture)
+        check("a picture becomes the menu background", dvd.backgroundImage != nil && dvd.backgroundURL == picture && dvd.backgroundProblem == nil)
+        dvd.setBackground(notAPicture)
+        check("a picture that cannot be read is named, and the last good one stays",
+              dvd.backgroundProblem?.contains("notes.png") == true && dvd.backgroundURL == picture)
+        dvd.removeBackground()
+        check("Remove goes back to the built-in background", dvd.backgroundImage == nil && dvd.backgroundProblem == nil)
+        await dvd.setMusic(music)
+        check("music is read with its length", dvd.musicURL == music && abs(dvd.musicSeconds - 2) < 0.2, "\(dvd.musicSeconds)")
+        await dvd.setMusic(notMusic)
+        check("music that cannot be read is named, and the menu stays as it was", dvd.musicProblem?.contains("tune.mp3") == true && dvd.musicURL == music)
+        dvd.removeMusic()
+        check("Remove goes back to silence", dvd.musicURL == nil && dvd.musicSeconds == 0)
+        let titles = [DVDMenuTitle(name: "One")]
+        let plain = DVDMenuRenderer.render(discName: "Own", titles: titles, standard: .ntsc)[0].picture
+        let withPicture = DVDMenuRenderer.render(discName: "Own", titles: titles, standard: .ntsc, background: dvd.backgroundImage ?? FixtureVideoSource.gradient(seed: 3))[0].picture
+        check("a chosen picture changes the menu", plain != withPicture)
+    }
+
+    /// A silent 16-bit mono WAV file, long enough to read a length from.
+    private static func wave(seconds: Int) -> Data {
+        let rate = 8_000, bytes = rate * 2 * seconds
+        var data = Data()
+        func u32(_ v: Int) { withUnsafeBytes(of: UInt32(v).littleEndian) { data.append(contentsOf: $0) } }
+        func u16(_ v: Int) { withUnsafeBytes(of: UInt16(v).littleEndian) { data.append(contentsOf: $0) } }
+        data.append(contentsOf: Array("RIFF".utf8)); u32(36 + bytes); data.append(contentsOf: Array("WAVEfmt ".utf8))
+        u32(16); u16(1); u16(1); u32(rate); u32(rate * 2); u16(2); u16(16)
+        data.append(contentsOf: Array("data".utf8)); u32(bytes); data.append(Data(count: bytes))
+        return data
     }
 }
