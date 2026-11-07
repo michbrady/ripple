@@ -669,7 +669,8 @@ UX:
 - States: the usual messages from `BurnModel` (too small, not blank, a CD in the drive); the work folder is removed after a good burn
 - Words: unchanged: "Unable to Burn the Disc", "Try Again"
 - Access: as burning today
-Status: todo
+Status: doing
+Note: Burn Disc on the Disc Ready page burns the finished image as a `.video` job through the same burner, stages, Cancel, and messages as the other disc types. `DiscRecordingBurner` hands the .iso to DiscRecording (`DRBurn.layout(forImageFile:)`), with verify on. Unit and self-test checks cover the recorded job, a CD, no disc, a disc that is too small, Cancel, and the quit guard. NOT yet tried on a real disc: it needs a blank DVD-R or a rewritable DVD-RW in the drive, and a DVD player to check the menu and the buttons. The disc image is kept until Start Over, so a second copy can be burned.
 
 ### S-048 Carry the tools
 As the user, I install Ripple and the DVD feature just works.

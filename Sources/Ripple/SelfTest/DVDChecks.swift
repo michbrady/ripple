@@ -22,6 +22,7 @@ extension SelfTest {
         menuChecks(dvd: dvd)
         await menuMediaChecks()
         await buildChecks(burn: burn, dvd: dvd)
+        await burnImageChecks(burn: burn, dvd: dvd)
     }
 
     /// S-040: dropped files and folders become rows; other files are counted and skipped; bad videos say why.
@@ -263,6 +264,48 @@ extension SelfTest {
 
         dvd.showSnapshot(.videoOver)
         check("a list that is too long cannot be built", !dvd.canBuild(on: state))
+        dvd.makeMaker = { project, work in FixtureDVDMaker(project: project, work: work) }
+        burn.showSnapshot(.empty)
+        dvd.showSnapshot(.empty)
+    }
+
+    /// S-047: the finished disc image burns through the same burner, with the usual refusals and Cancel.
+    private static func burnImageChecks(burn: BurnModel, dvd: DVDModel) async {
+        guard let burner = burn.burner as? FixtureBurner else { return }
+        burn.showSnapshot(.videoEmpty)
+        dvd.showSnapshot(.videoList)
+        dvd.remove(ids: Set(dvd.items.filter { if case .ready = $0.state { false } else { true } }.map(\.id)))
+        dvd.makeMaker = { project, work in FixtureDVDMaker(project: project, work: work, stepDelay: .milliseconds(2)) }
+        dvd.build(on: burn.deviceState)
+        await wait(until: { if case .ready = dvd.phase { true } else { false } })
+        guard case .ready(let result) = dvd.phase else { return check("the disc builds before it is burned", false) }
+        let bytes = (try? result.image.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+
+        check("a blank DVD-R takes the image", burn.imageProblem(bytes: bytes) == nil)
+        check("a CD is refused for a Video DVD", burn.imageProblem(bytes: bytes, on: FixtureBurner.blankCD())?.contains("blank DVD-R or DVD-RW") == true)
+        check("a blank CD-R is not a DVD", burn.imageProblem(bytes: bytes, on: .noDisc)?.contains("DVD-R or DVD-RW") == true)
+        check("a disc that is too small is refused",
+              burn.imageProblem(bytes: 4_000_000_000, on: .ready(BurnMedia(kind: .dvd, label: "DVD-R", blocksFree: 1_000)))?.contains("too small") == true)
+
+        burner.stepDelay = .milliseconds(2)
+        let before = burner.jobs.count
+        burn.burnImage(result.image, volumeName: dvd.cleanDiscName)
+        check("Burn Disc starts burning", burn.isBurning)
+        await wait(until: { burn.phase == .done })
+        check("the image is burned as a Video DVD job", burn.phase == .done && burner.jobs.count == before + 1
+              && burner.jobs.last?.type == .video && burner.jobs.last?.files == [result.image])
+        check("a burned disc no longer guards against quitting", !dvd.hasUnsavedDisc && !dvd.isBusy)
+
+        burn.tryAgain()
+        burner.stepDelay = .milliseconds(300)
+        burn.burnImage(result.image, volumeName: dvd.cleanDiscName)
+        await wait(until: { burn.canCancel })
+        burn.cancel()
+        await wait(until: { !burn.isBurning })
+        check("Cancel stops the burn and writes nothing", burn.phase == .editing && burner.jobs.count == before + 1)
+
+        burner.stepDelay = .milliseconds(5)
+        dvd.startOver()
         dvd.makeMaker = { project, work in FixtureDVDMaker(project: project, work: work) }
         burn.showSnapshot(.empty)
         dvd.showSnapshot(.empty)

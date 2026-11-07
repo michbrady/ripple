@@ -339,8 +339,15 @@ struct DVDBuilding: View {
 /// The disc is made: burn it, or save it as an image.
 struct DVDReady: View {
     @Environment(DVDModel.self) private var dvd
+    @Environment(BurnModel.self) private var burn
     @State private var confirmingDiscard = false
     let result: DVDBuildResult
+
+    /// Why Burn Disc is off: no blank DVD, a CD, or a disc that is too small. Save Disc Image works either way.
+    private var problem: String? {
+        let size = (try? result.image.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        return burn.imageProblem(bytes: size)
+    }
 
     var body: some View {
         ContentUnavailableView {
@@ -353,7 +360,12 @@ struct DVDReady: View {
                 }
             }
         } actions: {
-            HStack {
+            VStack(spacing: Space.md) {
+              HStack {
+                Button("Burn Disc") { burn.burnImage(result.image, volumeName: dvd.cleanDiscName) }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(problem != nil)
+                    .help(problem ?? "Burn the disc to the blank DVD in the drive")
                 Button("Save Disc Image\u{2026}") { dvd.chooseImageDestination() }
                     .help("Save the disc as an .iso file to open in a DVD player app or burn later")
                 if let saved = dvd.savedImage {
@@ -362,8 +374,12 @@ struct DVDReady: View {
                 Button("Start Over") {
                     if dvd.hasUnsavedDisc { confirmingDiscard = true } else { dvd.startOver() }
                 }
+              }
+              .fixedSize()
+              if let problem {
+                  Label(problem, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(Surface.warning)
+              }
             }
-            .fixedSize()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .confirmationDialog("Discard the Finished Disc?", isPresented: $confirmingDiscard) {

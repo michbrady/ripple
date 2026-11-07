@@ -442,3 +442,15 @@ import Testing
         #expect(DiscType(rawValue: "video") == .video)
     }
 }
+
+@Suite struct VideoDVDBurnTests {
+    @Test func theFixtureBurnerRecordsAnImageJob() async throws {
+        let burner = FixtureBurner(state: FixtureBurner.blankDVD())
+        burner.stepDelay = .milliseconds(1)
+        let image = URL(fileURLWithPath: "/tmp/disc.iso")
+        try await burner.burn(BurnJob(type: .video, files: [image], volumeName: "Trip")) { _ in }
+        #expect(burner.jobs.count == 1)
+        #expect(burner.jobs[0].type == .video)
+        #expect(burner.jobs[0].files == [image])
+    }
+}

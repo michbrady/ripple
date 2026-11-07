@@ -173,6 +173,11 @@ final class DVDModel: StoppableJob {
 
     func cancelBuild() { buildTask?.cancel() }
 
+    /// The finished disc was burned, so leaving no longer loses it.
+    func markBurned() {
+        if case .ready = phase { isBurned = true }
+    }
+
     /// Asks where to put the .iso, then saves it.
     func chooseImageDestination() {
         guard case .ready = phase else { return }

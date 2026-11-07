@@ -115,7 +115,11 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
             }
             layout = DRTrack(forRootFolder: root) as Any
         case .video:
-            throw BurnError.driveError("Burning a Video DVD is not ready yet.")   // S-047
+            // The finished disc image, written as it is. Nothing is prepared, so Cancel works until writing starts.
+            guard let image = job.files.first, let imageLayout = DRBurn.layout(forImageFile: image.path) else {
+                throw BurnError.discRejected("The disc image could not be read.")
+            }
+            layout = imageLayout
         }
         guard let burn = DRBurn(device: device) else { throw BurnError.noDisc }
         burn.setProperties([

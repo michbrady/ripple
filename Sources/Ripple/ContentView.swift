@@ -56,6 +56,7 @@ struct ContentView: View {
             }
         }
         .task {
+            burn.didFinishVideoBurn = { dvd.markBurned() }
             model.start()
             burn.start()
             SelfTest.runIfRequested(model: model, burn: burn, dvd: dvd)

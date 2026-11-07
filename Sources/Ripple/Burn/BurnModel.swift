@@ -22,6 +22,9 @@ final class BurnModel: StoppableJob {
 
     static weak var current: BurnModel?
 
+    /// Called when a Video DVD finished burning, so the disc is no longer unsaved work.
+    var didFinishVideoBurn: (() -> Void)?
+
     var items: [BurnItem] = []
     /// Folders made by hand for an MP3 Disc, empty ones included. Folders that hold files exist without being listed here.
     private(set) var madeFolders: [String] = []
@@ -77,8 +80,11 @@ final class BurnModel: StoppableJob {
     var canBurn: Bool { phase == .editing && isReady && fit == .fits }
 
     /// One line about the drive and the disc in it.
-    var deviceLine: String {
-        switch deviceState {
+    var deviceLine: String { deviceLine(for: deviceState, type: type) }
+
+    /// The same line for any disc state and disc type.
+    func deviceLine(for state: BurnDeviceState, type: DiscType) -> String {
+        switch state {
         case .noDrive: "Connect a USB burner to burn a disc."
         case .noDisc:
             switch type {
@@ -90,7 +96,7 @@ final class BurnModel: StoppableJob {
             rewritable ? "This \(label) is not blank. Erase it in Disk Utility, then insert it again."
                        : "This \(label) is not blank. Insert a blank disc."
         case .ready(let media):
-            isReady ? "\(deviceName) · blank \(media.label)" : "Insert a blank DVD-R or DVD-RW. This disc is a \(media.label)."
+            type == .video && media.kind != .dvd ? "Insert a blank DVD-R or DVD-RW. This disc is a \(media.label)." : "\(deviceName) \u{00B7} blank \(media.label)"
         }
     }
 
@@ -291,8 +297,27 @@ final class BurnModel: StoppableJob {
 
     func burn() {
         guard canBurn else { return }
-        let job = BurnJob(type: type, files: items.map(\.url), volumeName: volumeName,
-                          placements: type == .data ? items.map(\.folder) : [], folders: type == .data ? folderPaths : [])
+        run(BurnJob(type: type, files: items.map(\.url), volumeName: volumeName,
+                    placements: type == .data ? items.map(\.folder) : [], folders: type == .data ? folderPaths : []))
+    }
+
+    /// Why a finished Video DVD image cannot be burned to the disc in the drive, or `nil` when it can.
+    func imageProblem(bytes: Int, on state: BurnDeviceState? = nil) -> String? {
+        guard phase == .editing else { return "Another disc is being burned." }
+        let state = state ?? deviceState
+        guard case .ready(let media) = state, media.kind == .dvd else { return deviceLine(for: state, type: .video) }
+        let blocks = (bytes + 2_047) / 2_048
+        return blocks > media.blocksFree ? "This \(media.label) is too small for the disc. Insert a blank DVD-R or DVD-RW with more room." : nil
+    }
+
+    /// Burns a finished disc image (a Video DVD) with the same stages, Cancel, and messages as any other burn.
+    func burnImage(_ image: URL, volumeName: String) {
+        guard let size = try? image.resourceValues(forKeys: [.fileSizeKey]).fileSize, imageProblem(bytes: size) == nil else { return }
+        type = .video
+        run(BurnJob(type: .video, files: [image], volumeName: volumeName))
+    }
+
+    private func run(_ job: BurnJob) {
         isCancelling = false
         phase = .burning(.preparing)
         let burner = burner
@@ -302,6 +327,7 @@ final class BurnModel: StoppableJob {
                     Task { @MainActor in self?.stage(stage) }
                 }
                 self?.phase = .done
+                if job.type == .video { self?.didFinishVideoBurn?() }
             } catch is CancellationError {
                 self?.phase = .editing
             } catch {
