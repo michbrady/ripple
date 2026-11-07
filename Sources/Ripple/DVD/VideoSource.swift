@@ -43,7 +43,7 @@ struct LiveVideoSource: VideoSource {
     }
 }
 
-/// File names decide the result: "protected" and "broken" fail; anything else is a 16:9 video whose length comes from the name.
+/// File names decide the result: "protected" and "broken" fail; "pal" is 25 frames a second; "old" is 4:3; anything else is a 16:9 video whose length comes from the name.
 struct FixtureVideoSource: VideoSource {
     func read(_ url: URL) async -> Result<VideoFile, VideoProblem> {
         let name = url.lastPathComponent.lowercased()
@@ -51,7 +51,8 @@ struct FixtureVideoSource: VideoSource {
         if name.contains("broken") { return .failure(.unreadable) }
         let seconds = Double(300 + abs(url.lastPathComponent.hashValue % 3000))
         return .success(VideoFile(url: url, title: VideoProbe.defaultTitle(for: url), bytes: Int(seconds * 450_000), seconds: seconds,
-                                  width: 1280, height: 720, framesPerSecond: 29.97, displayAspect: 16.0 / 9, hasAudio: true))
+                                  width: 1280, height: 720, framesPerSecond: name.contains("pal") ? 25 : 29.97, displayAspect: name.contains("old") ? 4.0 / 3 : 16.0 / 9,
+                                  hasAudio: true))
     }
 
     func picture(for file: VideoFile) async -> CGImage? { Self.gradient(seed: abs(file.title.hashValue)) }

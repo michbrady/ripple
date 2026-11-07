@@ -528,13 +528,13 @@ Acceptance:
 - [unit] A 16:9 source stays 16:9; a 4:3 source gets bars at the sides; other shapes get bars on the sides or the top to fit without stretching.
 - [self] A choice in the window overrides the suggestion.
 UX:
-- Flow: the standard is guessed from the videos and shown in the bottom bar as a pop-up "TV Standard: NTSC"; the user changes it there. Screen shape is per video, in the row's context menu: "Widescreen (16:9)" or "Standard (4:3)"
+- Flow: the standard is guessed from the videos and shown in the bottom bar as a pop-up "TV Standard: NTSC"; the user changes it there. Screen shape is one choice for the whole disc, a second pop-up "Screen": "Widescreen (16:9)" or "Standard (4:3)"
 - Surface: inline pop-up and context menu (changes one value on screen)
 - States: mixed videos show "Videos use different standards. Ripple used NTSC, from the first one."
 - Words: "NTSC (US)", "PAL (Europe)", "TV Standard"
 - Access: the pop-up is a labelled control; VoiceOver "TV Standard, NTSC (US)"
-Status: doing
-Note: NTSC or PAL from the frame rate, and the 4:3 or 16:9 fit with bars, are built and tested, and a real ffmpeg conversion was read back. The choices in the window are not built yet.
+Status: done
+Note: Two pop-ups in the bottom bar (TV Standard, Screen). The screen shape is one choice per disc, not per video, because the disc authoring step sets one frame shape for all titles; it starts as widescreen when at least half the videos are. Videos of another shape still get bars. Snapshot page: `burn-videoList`.
 
 ### S-044 Make the menu
 As the user, Ripple draws a menu for the disc: its name, a button for each title with a picture, and Play All.

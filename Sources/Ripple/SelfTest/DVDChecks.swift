@@ -18,6 +18,7 @@ extension SelfTest {
         burn.type = .audio
         await videoListChecks(dvd: dvd)
         fitChecks(burn: burn, dvd: dvd)
+        await standardChecks()
     }
 
     /// S-040: dropped files and folders become rows; other files are counted and skipped; bad videos say why.
@@ -91,5 +92,32 @@ extension SelfTest {
               dvd.plan(on: .ready(BurnMedia(kind: .dvd, label: "DVD-R DL", blocksFree: DVDPlan.dualLayerBlocks))).fit == .fits)
         burn.showSnapshot(.empty)
         dvd.showSnapshot(.empty)
+    }
+
+    /// S-043: NTSC or PAL from the videos, a choice that overrides it, and one frame shape for the disc.
+    private static func standardChecks() async {
+        let fm = FileManager.default
+        let folder = fm.temporaryDirectory.appending(path: "ripple-standard-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: folder) }
+        func make(_ name: String) -> URL {
+            let url = folder.appending(path: name)
+            fm.createFile(atPath: url.path, contents: Data("x".utf8))
+            return url
+        }
+        let dvd = DVDModel(source: FixtureVideoSource())
+        await dvd.add([make("a.mp4")])
+        check("29.97 frames a second suggests NTSC and 16:9", dvd.standard == .ntsc && dvd.widescreen && dvd.mixedNote == nil)
+        await dvd.add([make("b_pal.mp4")])
+        check("mixed videos use the first standard and say so", dvd.standard == .ntsc && dvd.mixedNote?.contains("different standards") == true, dvd.mixedNote ?? "")
+        dvd.standardChoice = .pal
+        check("a choice in the window overrides the suggestion", dvd.standard == .pal && dvd.mixedNote == nil && dvd.plan(on: .noDisc).standard == .pal)
+        let pal = DVDModel(source: FixtureVideoSource())
+        await pal.add([make("only_pal.mp4")])
+        check("25 frames a second suggests PAL", pal.standard == .pal)
+        await pal.add([make("old_one.mp4"), make("old_two.mp4")])
+        check("mostly 4:3 videos suggest a standard screen", !pal.widescreen)
+        pal.widescreenChoice = true
+        check("the screen choice overrides the suggestion", pal.widescreen)
     }
 }

@@ -42,8 +42,25 @@ final class DVDModel: StoppableJob {
 
     var tooMany: Bool { items.count > 99 }
 
-    /// NTSC or PAL, as the videos suggest. S-043 lets the user override it.
-    var standard: TVStandard { TVStandard.suggest(for: videos) }
+    /// What the user chose in the bar. `nil` follows the videos.
+    var standardChoice: TVStandard?
+    var widescreenChoice: Bool?
+
+    /// NTSC or PAL: the user's choice, or what the first video suggests.
+    var standard: TVStandard { standardChoice ?? TVStandard.suggest(for: videos) }
+
+    /// One frame shape for the whole disc: the user's choice, or widescreen when at least half the videos are.
+    var widescreen: Bool {
+        if let widescreenChoice { return widescreenChoice }
+        let wide = videos.filter(\.isWidescreen).count
+        return videos.isEmpty || wide * 2 >= videos.count
+    }
+
+    /// Said under the bar when the videos disagree and the user has not chosen.
+    var mixedNote: String? {
+        guard standardChoice == nil, TVStandard.mixed(videos) else { return nil }
+        return "Videos use different standards. Ripple used \(standard.title), from the first one."
+    }
 
     /// The plan on the disc in the drive, or on a single-layer DVD when there is none.
     func plan(on state: BurnDeviceState) -> DVDPlan {

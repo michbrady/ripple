@@ -200,6 +200,7 @@ struct DVDBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
             if !dvd.videos.isEmpty { fit }
+            if !dvd.videos.isEmpty { choices }
             HStack(spacing: Space.md) {
                 Image(systemName: burn.isReady ? "checkmark.circle.fill" : "exclamationmark.circle")
                     .foregroundStyle(burn.isReady ? Color.secondary : Surface.warning)
@@ -208,6 +209,31 @@ struct DVDBar: View {
             }
         }
         .padding(Space.lg)
+    }
+
+    /// TV Standard and screen shape, with what they were guessed from.
+    private var choices: some View {
+        @Bindable var dvd = dvd
+        return VStack(alignment: .leading, spacing: Space.xs) {
+            HStack(spacing: Space.lg) {
+                Picker("TV Standard", selection: Binding(get: { dvd.standard }, set: { dvd.standardChoice = $0 })) {
+                    Text("NTSC (US)").tag(TVStandard.ntsc)
+                    Text("PAL (Europe)").tag(TVStandard.pal)
+                }
+                .fixedSize()
+                .help("The kind of TV the disc is made for")
+                Picker("Screen", selection: Binding(get: { dvd.widescreen }, set: { dvd.widescreenChoice = $0 })) {
+                    Text("Widescreen (16:9)").tag(true)
+                    Text("Standard (4:3)").tag(false)
+                }
+                .fixedSize()
+                .help("The shape of the picture. Videos of another shape get bars, never stretching")
+                Spacer()
+            }
+            if let note = dvd.mixedNote {
+                Label(note, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var fit: some View {
