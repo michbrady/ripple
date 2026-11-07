@@ -660,7 +660,7 @@ UX:
 - Words: "Disc Ready", "Burn Disc", "Save Disc Image…", "Show in Finder", "Start Over"
 - Access: both buttons are in the tab order; VoiceOver reads the summary line first
 Status: done
-Note: After a build the Disc Ready page offers Save Disc Image… (a save panel named after the disc), Show in Finder once saved, and Start Over, which asks "Discard the Finished Disc?" when the disc is neither saved nor burned. Quitting asks the same. Saving needs no drive. Snapshot page: `burn-videoDone`. The image's contents (VIDEO_TS, AUDIO_TS, volume name) are covered by the DVDBuilder pipeline test, which mounts a real image.
+Note: After a build the Disc Ready page offers Save Disc Image… (a save panel named after the disc), Show in Finder once saved, and Start Over, which asks "Discard the Finished Disc?" when the disc is neither saved nor burned. Quitting asks the same. Saving needs no drive. Snapshot page: `burn-videoDone`. The image's contents (VIDEO_TS, AUDIO_TS, volume name) are covered by the DVDBuilder pipeline test, which mounts a real image. A real build's image was mounted and its volume name checked with diskutil: it is the disc's name as a DVD label ("Real Test" becomes REAL_TEST), with VIDEO_TS and AUDIO_TS inside (DVDRealBuildTests).
 
 ### S-047 Burn the Video DVD
 As the user, I put in a blank DVD-R or DVD-RW and burn the disc.

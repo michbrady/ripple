@@ -28,6 +28,9 @@ final class DVDRealBuildTests: XCTestCase {
         let attach = try await ProcessRunner.run(URL(fileURLWithPath: "/usr/bin/hdiutil"), ["attach", "-readonly", "-nobrowse", "-mountpoint", mount.path, result.image.path])
         XCTAssertEqual(attach.status, 0, attach.error)
         defer { Task { _ = try? await ProcessRunner.run(URL(fileURLWithPath: "/usr/bin/hdiutil"), ["detach", mount.path, "-force"]) } }
+        // The volume name is the disc's name, as a DVD label.
+        let info = try await ProcessRunner.run(URL(fileURLWithPath: "/usr/sbin/diskutil"), ["info", mount.path])
+        XCTAssertTrue((info.output + info.error).contains("REAL_TEST"), "the volume is not named after the disc:\n\(info.output)")
         let video_ts = try FileManager.default.contentsOfDirectory(atPath: mount.appending(path: "VIDEO_TS").path)
         XCTAssertTrue(video_ts.contains("VIDEO_TS.IFO"))
         XCTAssertTrue(video_ts.contains { $0.hasPrefix("VTS_01_") && $0.hasSuffix(".VOB") })
