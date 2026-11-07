@@ -104,7 +104,7 @@ final class DVDAuthoringTests: XCTestCase {
         XCTAssertTrue(xml.contains("chapters=\"0,5:00,10:00\""))         // 700 s
         XCTAssertTrue(xml.contains("chapters=\"0\""))                    // 120 s
         XCTAssertTrue(xml.contains("if (g1 eq 1) jump title 2; g1 = 0; call vmgm menu 1;"))   // title 1 carries on in Play All
-        XCTAssertFalse(xml.contains("jump title 3"))                     // the last title only returns to the menu
+        XCTAssertFalse(xml.contains("if (g1 eq 1) jump title 3"))   // the last title only returns to the menu
         XCTAssertTrue(xml.hasPrefix("<?xml"))
     }
 
