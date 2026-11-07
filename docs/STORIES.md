@@ -516,8 +516,8 @@ UX:
 - States: fits "1 h 42 min of 1 h 50 min · Excellent"; reduced "Reduced quality: the picture is softer to fit everything"; too long (red, with an icon) "Too long by 24 min. Remove a video or use a dual-layer disc."; no disc in the bar still shows the single-layer size and says "Based on a single-layer DVD."
 - Words: quality words Excellent, Good, Reduced; "Too long"; no "bitrate" anywhere
 - Access: the bar is one accessibility element: "Disc 92 percent full, quality Good"; Too long is an icon and words
-Status: doing
-Note: The plan (bit rate, quality bands, fit, dual layer) is built and tested. The bar in the window is not built yet.
+Status: done
+Note: The bar shows the videos' length against the longest that still reaches Reduced on the disc in the drive (single-layer when none), with the quality word. Snapshot pages `burn-videoList` (Excellent) and `burn-videoOver` (Too long). The UX example's "of 1 h 50 min" is the Excellent limit; the built bar uses the Reduced limit so it fills only when the disc is really full.
 
 ### S-043 TV standard and screen shape
 As the user, the disc is made for my TV: NTSC by default, PAL when my videos are PAL, widescreen or standard per video.

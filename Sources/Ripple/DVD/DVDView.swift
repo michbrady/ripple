@@ -192,17 +192,55 @@ struct DVDRow: View {
     }
 }
 
-/// The drive and disc on the left; Build Disc comes on the right in S-045.
+/// How full the disc is and how good the picture will be, then the drive.
 struct DVDBar: View {
     @Environment(BurnModel.self) private var burn
+    @Environment(DVDModel.self) private var dvd
 
     var body: some View {
-        HStack(spacing: Space.md) {
-            Image(systemName: burn.isReady ? "checkmark.circle.fill" : "exclamationmark.circle")
-                .foregroundStyle(burn.isReady ? Color.secondary : Surface.warning)
-            Text(burn.deviceLine).lineLimit(2)
-            Spacer()
+        VStack(alignment: .leading, spacing: Space.md) {
+            if !dvd.videos.isEmpty { fit }
+            HStack(spacing: Space.md) {
+                Image(systemName: burn.isReady ? "checkmark.circle.fill" : "exclamationmark.circle")
+                    .foregroundStyle(burn.isReady ? Color.secondary : Surface.warning)
+                Text(burn.deviceLine).lineLimit(2)
+                Spacer()
+            }
         }
         .padding(Space.lg)
+    }
+
+    private var fit: some View {
+        let plan = dvd.plan(on: burn.deviceState)
+        let tooLong: Bool = { if case .tooLong = plan.fit { true } else { false } }()
+        return VStack(alignment: .leading, spacing: Space.xs) {
+            ProgressView(value: min(1, plan.usedFraction))
+                .tint(tooLong ? Surface.warning : nil)
+                .accessibilityLabel("Disc capacity")
+                .accessibilityValue(summary(plan))
+            HStack(spacing: Space.xs) {
+                Text(summary(plan)).monospacedDigit().foregroundStyle(.secondary)
+                if case .tooLong(let seconds) = plan.fit {
+                    Label("Too long by \(DVDPlan.approximateText(seconds)). Remove a video or use a dual-layer disc.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Surface.warning)
+                }
+            }
+            .font(.callout)
+            if plan.quality == .reduced {
+                Label("Reduced quality: the picture is softer to fit everything.", systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
+            }
+            if !isDVD { Label("Based on a single-layer DVD.", systemImage: "info.circle").font(.callout).foregroundStyle(.secondary) }
+        }
+    }
+
+    private var isDVD: Bool {
+        if case .ready(let media) = burn.deviceState { return media.kind == .dvd }
+        return false
+    }
+
+    private func summary(_ plan: DVDPlan) -> String {
+        let used = DVDPlan.approximateText(plan.totalSeconds), room = DVDPlan.approximateText(plan.longestReducedSeconds)
+        if case .tooLong = plan.fit { return "\(used) of \(room)" }
+        return "\(used) of \(room) \u{00B7} \(plan.quality.title)"
     }
 }

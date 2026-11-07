@@ -192,6 +192,23 @@ final class DVDPlanTests: XCTestCase {
     }
 }
 
+final class DVDBarTextTests: XCTestCase {
+    func testApproximateTimes() {
+        XCTAssertEqual(DVDPlan.approximateText(42 * 60), "42 min")
+        XCTAssertEqual(DVDPlan.approximateText(102 * 60 + 10), "1 h 42 min")
+        XCTAssertEqual(DVDPlan.approximateText(7_200), "2 h")
+    }
+
+    func testTheBarFillsAsTheVideosGrow() {
+        func video(_ seconds: Double) -> VideoFile {
+            VideoFile(url: URL(fileURLWithPath: "/tmp/a.mp4"), title: "a", bytes: 1, seconds: seconds, width: 1280, height: 720, framesPerSecond: 30, displayAspect: 16.0 / 9, hasAudio: true)
+        }
+        let half = DVDPlan(files: [video(DVDPlan(files: [], standard: .ntsc).longestReducedSeconds / 2)], standard: .ntsc)
+        XCTAssertEqual(half.usedFraction, 0.5, accuracy: 0.001)
+        XCTAssertEqual(DVDPlan(files: [], standard: .ntsc).usedFraction, 0)
+    }
+}
+
 final class VideoLengthTextTests: XCTestCase {
     func testLengthsReadLikeAPlayersClock() {
         XCTAssertEqual(VideoFile.lengthText(245), "4:05")

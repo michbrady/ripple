@@ -17,6 +17,7 @@ extension SelfTest {
         burn.showSnapshot(.empty)
         burn.type = .audio
         await videoListChecks(dvd: dvd)
+        fitChecks(burn: burn, dvd: dvd)
     }
 
     /// S-040: dropped files and folders become rows; other files are counted and skipped; bad videos say why.
@@ -74,6 +75,21 @@ extension SelfTest {
         while um.canUndo { um.undo() }
         check("Undo brings back every change, in order", ids() == start && dvd.videos.map(\.title) == startTitles, "\(ids().map(\.lastPathComponent))")
         dvd.undoManager = nil
+
+        dvd.showSnapshot(.empty)
+    }
+
+    /// S-042: the plan follows the list and the disc in the drive.
+    private static func fitChecks(burn: BurnModel, dvd: DVDModel) {
+        burn.showSnapshot(.videoEmpty)
+        dvd.showSnapshot(.videoList)
+        let ready = dvd.plan(on: burn.deviceState)
+        check("a few videos fit with Excellent quality", ready.fit == .fits && ready.quality == .excellent, "\(ready.quality)")
+        dvd.showSnapshot(.videoOver)
+        check("too many hours says Too long, with minutes to remove", { if case .tooLong(let s) = dvd.plan(on: burn.deviceState).fit { s > 600 } else { false } }())
+        check("a dual-layer disc in the drive raises the capacity",
+              dvd.plan(on: .ready(BurnMedia(kind: .dvd, label: "DVD-R DL", blocksFree: DVDPlan.dualLayerBlocks))).fit == .fits)
+        burn.showSnapshot(.empty)
         dvd.showSnapshot(.empty)
     }
 }

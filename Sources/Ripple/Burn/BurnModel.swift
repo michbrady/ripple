@@ -386,7 +386,7 @@ final class BurnModel: StoppableJob {
             items = list + (7...20).map { file($0, "Long Piece \($0)", "The Tones", 330) }
             sourceFolder = URL(fileURLWithPath: "/Music/Mix", isDirectory: true)
             deviceState = FixtureBurner.blankCD()
-        case .videoList:
+        case .videoList, .videoOver:
             type = .video
             items = []
             deviceState = FixtureBurner.blankDVD()
@@ -419,5 +419,5 @@ final class BurnModel: StoppableJob {
 }
 
 enum BurnSnapshotPage: String, CaseIterable {
-    case empty, list, folders, noDisc, over, dvd, burning, done, failed, videoEmpty, videoList
+    case empty, list, folders, noDisc, over, dvd, burning, done, failed, videoEmpty, videoList, videoOver
 }

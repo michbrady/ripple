@@ -42,6 +42,14 @@ final class DVDModel: StoppableJob {
 
     var tooMany: Bool { items.count > 99 }
 
+    /// NTSC or PAL, as the videos suggest. S-043 lets the user override it.
+    var standard: TVStandard { TVStandard.suggest(for: videos) }
+
+    /// The plan on the disc in the drive, or on a single-layer DVD when there is none.
+    func plan(on state: BurnDeviceState) -> DVDPlan {
+        DVDPlan(files: videos, standard: standard, capacityBlocks: DVDPlan.capacity(for: state))
+    }
+
     var isBusy: Bool { false }
 
     var stopPrompt: (title: String, detail: String, stop: String, keep: String) {
@@ -171,7 +179,7 @@ final class DVDModel: StoppableJob {
     func showSnapshot(_ page: BurnSnapshotPage) {
         skipped = 0
         items = []
-        guard page == .videoList else { return }
+        guard page == .videoList || page == .videoOver else { return }
         func video(_ name: String, _ seconds: Double) -> DVDItem {
             let url = URL(fileURLWithPath: "/Movies/\(name).mp4")
             let file = VideoFile(url: url, title: VideoProbe.defaultTitle(for: url), bytes: Int(seconds * 450_000), seconds: seconds,
@@ -179,6 +187,11 @@ final class DVDModel: StoppableJob {
             return DVDItem(url: url, state: .ready(file), picture: FixtureVideoSource.gradient(seed: abs(name.hashValue)))
         }
         items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142)]
+        if page == .videoOver {
+            items += [video("Wedding", 5_400), video("Honeymoon", 4_800), video("Graduation", 3_900)]
+            skipped = 0
+            return
+        }
         items.append(DVDItem(url: URL(fileURLWithPath: "/Movies/Rented Movie.m4v"), state: .problem(.copyProtected)))
         items.append(DVDItem(url: URL(fileURLWithPath: "/Movies/Old Tape.avi"), state: .reading))
         skipped = 2

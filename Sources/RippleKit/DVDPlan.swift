@@ -114,6 +114,15 @@ public struct DVDPlan: Equatable, Sendable {
     /// Converted size in bytes, for the "free space" check on the Mac.
     public var convertedBytes: Int { blocksNeeded * 2_048 }
 
+    /// "1 h 42 min" or "42 min", for the bar.
+    public static func approximateText(_ seconds: Double) -> String {
+        let minutes = Int((seconds / 60).rounded())
+        return minutes >= 60 ? (minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) min") : "\(minutes) min"
+    }
+
+    /// How much of the disc the videos use, 0 to 1 or more: their length against the longest that still reaches Reduced.
+    public var usedFraction: Double { longestReducedSeconds > 0 ? totalSeconds / longestReducedSeconds : 0 }
+
     public static func lengthText(_ seconds: Double) -> String {
         let total = Int(seconds.rounded())
         let h = total / 3_600, m = (total % 3_600) / 60, s = total % 60
