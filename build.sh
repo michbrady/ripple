@@ -47,6 +47,16 @@ if [[ -x "$here/.dvdtools/ffmpeg" ]]; then
   mkdir -p "$app/Contents/Resources/bin"
   cp "$here/.dvdtools/ffmpeg" "$app/Contents/Resources/bin/ffmpeg"
 fi
+# dvdauthor and spumux (tools/build-dvdauthor.sh) go in with the few libraries they need, with all three programs' licences.
+dvdbin="$here/.dvdtools/dvdauthor"
+if [[ -x "$dvdbin/bin/dvdauthor" && -x "$dvdbin/bin/spumux" ]]; then
+  mkdir -p "$app/Contents/Resources/bin" "$app/Contents/Resources/lib"
+  cp "$dvdbin/bin/dvdauthor" "$dvdbin/bin/spumux" "$app/Contents/Resources/bin/"
+  cp "$dvdbin/lib/"*.dylib "$app/Contents/Resources/lib/"
+fi
+if [[ -d "$app/Contents/Resources/bin" ]]; then
+  cp "$here/vendor/dvdtools/"* "$app/Contents/Resources/Licenses/"
+fi
 # The build links a path on this Mac so `swift run` works; a finished app must not carry it.
 install_name_tool -delete_rpath "$here/.lame" "$app/Contents/MacOS/$name" 2>/dev/null || true
 sed -e "s/__BUILD__/$(date +%Y%m%d%H%M)/" "$here/Info.plist.in" > "$app/Contents/Info.plist"
@@ -66,7 +76,10 @@ if [[ "$identity" == Developer\ ID* || "${HARDENED:-}" == 1 ]]; then flags=(--op
 [[ "$identity" == "-" ]] && flags=(${flags:#--timestamp})   # an ad hoc signature cannot be timestamped
 # Sign the library first, then the app that holds it.
 codesign --force "${flags[@]}" --sign "$identity" "$app/Contents/Frameworks/libmp3lame.0.dylib" 2>&1 | grep -v "replacing existing signature" || true
-[[ -f "$app/Contents/Resources/bin/ffmpeg" ]] && { codesign --force "${flags[@]}" --sign "$identity" "$app/Contents/Resources/bin/ffmpeg" 2>&1 | grep -v "replacing existing signature" || true; }
+# Programs and libraries inside the app are signed first, then the app that holds them.
+for inner in "$app"/Contents/Resources/lib/*.dylib "$app"/Contents/Resources/bin/*(N); do
+  [[ -f "$inner" ]] && { codesign --force "${flags[@]}" --sign "$identity" "$inner" 2>&1 | grep -v "replacing existing signature" || true; }
+done
 ents=()
 [[ -n "${ENTITLEMENTS:-}" ]] && ents=(--entitlements "$ENTITLEMENTS")   # see tools/fallback.entitlements
 codesign --force "${flags[@]}" "${ents[@]}" --sign "$identity" "$app" 2>&1 | grep -v "replacing existing signature" || true

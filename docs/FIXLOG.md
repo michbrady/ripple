@@ -78,3 +78,10 @@ Symptom: `notarize:4: read-only variable: status`, immediately after Apple's ans
 Cause: In zsh, `status` is a special read-only variable (the same as `$?`). The script used it as an ordinary name.
 Fix: Renamed it `verdict`.
 Rule: In zsh scripts, never name a variable `status`, `path`, `argv`, `options`, `pipestatus`, or other shell built-ins. Check a new script by running it once end to end on a harmless input before relying on it.
+
+## The first real dvdauthor run refused every menu button (M7, found when the real tools first ran)
+Symptom: The disc build failed at "Writing the disc files": `That form of jumping is not allowed in VMGM pgc 0, button b1`.
+Cause: Title buttons on the menu used `jump titleset 1 title N`. The stand-in tools in the tests never read the XML, so nothing caught it. The real dvdauthor accepts `jump title N` from the menu and refuses the longer form.
+Fix: Title and Play All buttons now use `jump title N`. A test builds a real disc image with the real ffmpeg, spumux, dvdauthor, and hdiutil, mounts it, and checks VIDEO_TS (DVDRealBuildTests, skipped when the tools are not built).
+Rule: A stand-in tool proves the order of steps, not that the real tool accepts what you give it. Run every external program for real once, in a test that skips when it is missing, before calling its step done.
+

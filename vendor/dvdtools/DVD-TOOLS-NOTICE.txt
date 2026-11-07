@@ -1,0 +1,18 @@
+Ripple makes a Video DVD with three separate programs. They are not part of Ripple's own code. Ripple starts them as ordinary programs and talks to them through their command lines, files, and standard input and output.
+
+They live in Ripple.app/Contents/Resources/bin, and the libraries two of them use are in Ripple.app/Contents/Resources/lib. You may replace any of them with your own build.
+
+FFmpeg 9.0.2 (static build from ffmpeg.martin-riedl.de)
+  Licence: GNU General Public License, version 3 or later (this build is configured with --enable-gpl --enable-version3). The licence text is in LICENSE-GPL-3.0.txt.
+  Source and project: https://ffmpeg.org/ (source code: https://ffmpeg.org/download.html). The build scripts and the exact build used: https://ffmpeg.martin-riedl.de/
+  What Ripple uses it for: reading videos, converting them to DVD video, making the menu video, and making pictures from videos.
+
+dvdauthor and spumux 0.7.2
+  Licence: GNU General Public License, version 2 or later. The licence text is in LICENSE-dvdauthor.txt.
+  Source and project: https://dvdauthor.sourceforge.net/ (source code: https://downloads.sourceforge.net/project/dvdauthor/dvdauthor-0.7.2.tar.gz)
+  What Ripple uses them for: laying the menu buttons over the menu video (spumux) and writing the disc's VIDEO_TS files (dvdauthor).
+  Built by Ripple's tools/build-dvdauthor.sh from that source, with these libraries copied next to them:
+    libpng (PNG licence), FreeType (FreeType Licence or GPL version 2), and Brotli (MIT licence).
+  Ripple's build does not include or link libdvdcss or any other library that decrypts copy-protected discs. Ripple does not read copy-protected video.
+
+The source code of each program is available at the addresses above.

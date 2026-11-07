@@ -120,11 +120,11 @@ public enum DVDAuthoring {
             .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
     }
 
-    /// The command a menu button runs. `g1` remembers whether Play All is on, so each title knows whether to carry on to the next.
+    /// The command a menu button runs. (From the menu, dvdauthor accepts `jump title N` and refuses `jump titleset 1 title N`; checked with the real program.) `g1` remembers whether Play All is on, so each title knows whether to carry on to the next.
     static func command(for action: DVDMenuAction, page: Int) -> String {
         switch action {
-        case .title(let n): "g1 = 0; jump titleset 1 title \(n);"
-        case .playAll: "g1 = 1; jump titleset 1 title 1;"
+        case .title(let n): "g1 = 0; jump title \(n);"
+        case .playAll: "g1 = 1; jump title 1;"
         case .next: "jump menu \(page + 2);"
         case .previous: "jump menu \(page);"
         }

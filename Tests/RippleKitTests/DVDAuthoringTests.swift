@@ -97,7 +97,7 @@ final class DVDAuthoringTests: XCTestCase {
         XCTAssertTrue(xml.contains("<fpc>g1 = 0; jump vmgm menu 1;</fpc>"))
         XCTAssertEqual(xml.components(separatedBy: "<pgc entry=\"title\"").count - 1, 1)   // only the first page is the entry
         XCTAssertTrue(xml.contains("<vob file=\"menu1.mpg\" pause=\"inf\" />")); XCTAssertTrue(xml.contains("<vob file=\"menu2.mpg\" pause=\"inf\" />"))
-        XCTAssertTrue(xml.contains("g1 = 0; jump titleset 1 title 1;")); XCTAssertTrue(xml.contains("g1 = 1; jump titleset 1 title 1;"))   // title 1 and Play All
+        XCTAssertTrue(xml.contains("g1 = 0; jump title 1;")); XCTAssertTrue(xml.contains("g1 = 1; jump title 1;"))   // title 1 and Play All
         XCTAssertTrue(xml.contains("jump menu 2;"))                      // Next on page 1
         XCTAssertTrue(xml.contains("jump menu 1;"))                      // Previous on page 2
         XCTAssertTrue(xml.contains("aspect=\"16:9\" widescreen=\"nopanscan\""))
