@@ -61,6 +61,7 @@ fills = {
     "TRACKS_LIGHT": image("tracks-light"), "TRACKS_DARK": image("tracks-dark"),
     "PICKER_LIGHT": image("picker-light"), "PICKER_DARK": image("picker-dark"),
     "BURN_LIGHT": image("burn-list-light"), "BURN_DARK": image("burn-list-dark"),
+    "DVD_LIGHT": image("dvd-menu-light"), "DVD_DARK": image("dvd-menu-dark"),
 }
 for key, value in fills.items():
     page = page.replace("{{%s}}" % key, value)
