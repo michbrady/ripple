@@ -5,6 +5,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(BurnModel.self) private var burn
+    @Environment(DVDModel.self) private var dvd
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -49,8 +50,8 @@ struct ContentView: View {
         .task {
             model.start()
             burn.start()
-            SelfTest.runIfRequested(model: model, burn: burn)
-            Snapshot.runIfRequested(model: model, burn: burn, openSettings: openSettings)
+            SelfTest.runIfRequested(model: model, burn: burn, dvd: dvd)
+            Snapshot.runIfRequested(model: model, burn: burn, dvd: dvd, openSettings: openSettings)
             // The installer is still open after a drag install: offer to eject it and trash the .dmg.
             if !Store.isOverridden {
                 try? await Task.sleep(for: .seconds(1.5))

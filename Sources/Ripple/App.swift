@@ -47,6 +47,9 @@ struct RippleApp: App {
                 Button("Burn Disc") { burn.burn() }
                     .keyboardShortcut("b")
                     .disabled(model.mode == .rip || !burn.canBurn)
+                Button("Add Videos…") { dvd.chooseVideos() }
+                    .keyboardShortcut("o")
+                    .disabled(model.mode == .rip || burn.type != .video || burn.phase != .editing)
                 Button("Eject Disc") { model.mode == .burn ? burn.eject() : model.eject() }
                     .keyboardShortcut("e")
                     .disabled(model.mode == .burn ? burn.isBusy : !model.hasDisc)

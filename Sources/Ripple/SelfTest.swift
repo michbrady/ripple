@@ -18,7 +18,7 @@ enum SelfTest {
     static var failures = 0
     static var count = 0
 
-    static func runIfRequested(model: AppModel, burn: BurnModel) {
+    static func runIfRequested(model: AppModel, burn: BurnModel, dvd: DVDModel) {
         guard requested else { return }
         // Print each line at once, so a crash keeps the lines before it.
         setvbuf(stdout, nil, _IOLBF, 0)
@@ -97,7 +97,7 @@ enum SelfTest {
             await tagChecks(model: model, out: out)
             await attentionChecks(model: model, out: out)
             await burnChecks(burn: burn, out: out)
-            await dvdChecks(burn: burn)
+            await dvdChecks(burn: burn, dvd: dvd)
             await polishChecks(model: model, out: out)
             await installerChecks(out: out)
             realDriveChecks()

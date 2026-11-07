@@ -10,7 +10,7 @@ import SwiftUI
 /// APP_SNAPSHOT_PAGES=empty,tracks limits the pages. Add "settings" to include Settings.
 /// Add APP_ACCENT=<id> to see the pages in another accent.
 enum Snapshot {
-    static func runIfRequested(model: AppModel, burn: BurnModel, openSettings: OpenSettingsAction) {
+    static func runIfRequested(model: AppModel, burn: BurnModel, dvd: DVDModel, openSettings: OpenSettingsAction) {
         let env = ProcessInfo.processInfo.environment
         guard let dir = env["APP_SNAPSHOT"], !dir.isEmpty else { return }
         // Snapshots never run against the real database.
@@ -41,6 +41,7 @@ enum Snapshot {
                 for page in BurnSnapshotPage.allCases where only?.contains("burn-\(page.rawValue)") ?? (only == nil) {
                     model.mode = .burn
                     burn.showSnapshot(page)
+                    dvd.showSnapshot(page)
                     try? await Task.sleep(for: .seconds(0.8))
                     capture(to: "\(dir)/burn-\(page.rawValue)-\(mode).png")
                 }

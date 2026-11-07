@@ -483,8 +483,8 @@ UX:
 - States: reading "Reading…" with a small spinner; unreadable "Ripple cannot read this video." with the reason; copy-protected "This video is copy-protected, so Ripple cannot read it."; skipped files "3 files were skipped because they are not videos." under the list; too many "A DVD holds 99 videos at most."
 - Words: "Choose Videos…", tooltip on + "Add videos to the disc (⌘O)"; row length "1:42:10", size "1.2 GB"
 - Access: rows are focusable; VoiceOver reads "Summer Trip, 1 hour 42 minutes, 1.2 gigabytes"; a problem is an icon and words, not only color
-Status: doing
-Note: The reader (length, size, rate, shape, sound, copy-protection) is built and tested on real .mov, .mp4, .avi, .mkv, .wmv, and .mpg files. The window is not built yet.
+Status: done
+Note: Rows read through a `VideoSource` (ffmpeg live; made-up files for snapshots and the self-test). Snapshot page: `burn-videoList`. The app finds ffmpeg in Contents/Resources/bin, or at the path in RIPPLE_FFMPEG until S-048 carries it. Not yet tried by hand with real files in the window: dropping a folder, and a real copy-protected movie.
 
 ### S-041 Order, name, and remove titles
 As the user, I put the videos in order, change each title's name, and remove ones I do not want.

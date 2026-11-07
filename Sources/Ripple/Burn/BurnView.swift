@@ -5,6 +5,7 @@ import SwiftUI
 /// Burn mode: choose a folder of MP3 or M4A files, see what fits, and burn.
 struct BurnView: View {
     @Environment(BurnModel.self) private var burn
+    @Environment(DVDModel.self) private var dvd
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
@@ -25,6 +26,10 @@ struct BurnView: View {
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard burn.phase == .editing else { return false }
+            if burn.type == .video {
+                Task { await dvd.add(urls) }
+                return true
+            }
             Task { await burn.drop(urls, into: "") }
             return true
         }

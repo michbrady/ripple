@@ -191,3 +191,11 @@ final class DVDPlanTests: XCTestCase {
         XCTAssertEqual(notVideo, .failure(.unreadable))
     }
 }
+
+final class VideoLengthTextTests: XCTestCase {
+    func testLengthsReadLikeAPlayersClock() {
+        XCTAssertEqual(VideoFile.lengthText(245), "4:05")
+        XCTAssertEqual(VideoFile.lengthText(3_600), "1:00:00")
+        XCTAssertEqual(VideoFile.lengthText(6_130), "1:42:10")
+    }
+}
