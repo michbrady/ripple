@@ -31,6 +31,8 @@ public enum VideoProblem: Error, Equatable, Sendable {
     case noPicture
     case copyProtected
     case tooShort
+    /// ffmpeg is not in the app, so no video can be read.
+    case toolMissing
 
     public var message: String {
         switch self {
@@ -38,6 +40,7 @@ public enum VideoProblem: Error, Equatable, Sendable {
         case .noPicture: "This file has no video."
         case .copyProtected: "This video is copy-protected, so Ripple cannot read it."
         case .tooShort: "This video is shorter than a second."
+        case .toolMissing: "ffmpeg is missing from Ripple, so it cannot read videos."
         }
     }
 }

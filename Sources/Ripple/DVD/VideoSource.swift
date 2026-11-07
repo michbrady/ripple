@@ -28,7 +28,7 @@ struct LiveVideoSource: VideoSource {
     var ffmpeg: URL?
 
     func read(_ url: URL) async -> Result<VideoFile, VideoProblem> {
-        guard let ffmpeg else { return .failure(.unreadable) }
+        guard let ffmpeg else { return .failure(.toolMissing) }
         return (try? await VideoProbe.read(url, ffmpeg: ffmpeg)) ?? .failure(.unreadable)
     }
 
@@ -38,8 +38,10 @@ struct LiveVideoSource: VideoSource {
         defer { try? FileManager.default.removeItem(at: out) }
         let at = min(10, max(0, file.seconds * 0.1))
         guard let r = try? await ProcessRunner.run(ffmpeg, DVDAuthoring.thumbnailArguments(input: file.url, output: out, at: at)), r.status == 0,
-              let source = CGImageSourceCreateWithURL(out as CFURL, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+              let data = try? Data(contentsOf: out), let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        // Decode now: the file is deleted when this function returns.
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
+        return image
     }
 }
 
