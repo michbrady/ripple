@@ -636,8 +636,8 @@ UX:
 - States: stages say "Checking the videos…", "Drawing the menu…", "Converting “Summer Trip” (2 of 5)…", "Writing the disc files…", "Making the disc image…"; time left shows only after the first minute, as "About 25 minutes left"; failure shows the `DVDBuildError` text with "Try Again" and "Back to Videos", which keeps the list; cancel returns to the list with nothing lost
 - Words: "Build Disc", "Cancel"; failure title "Unable to Build the Disc"
 - Access: the bar is a labelled progress indicator that reads the stage; Cancel is the Escape key and a button; the window does not sleep the Mac while building
-Status: doing
-Note: The whole pipeline runs against stand-in tools in the right order, with progress, a named failure, cancel with clean-up, and the real disc image mounted and read back (DVDBuilderTests). dvdauthor itself is not built yet, so a real disc has not been made.
+Status: done
+Note: Build Disc (⌘B or Return) switches the page to the build: stage in words, one bar, time left after the first minute, and Cancel (Esc), which returns to the list with the videos kept. A failure says which step did not work, with Back to Videos. Snapshot pages: `burn-videoBuilding`, `burn-videoFailed`. The self-test builds against `FixtureDVDMaker`. A real build cannot finish in the app yet: dvdauthor and spumux are not built or carried (S-048), and the build says "dvdauthor is missing from Ripple" before it starts.
 
 ### S-046 Make a disc image
 As the user, I can stop before burning and save the disc as an image (.iso) that opens in a DVD player app.

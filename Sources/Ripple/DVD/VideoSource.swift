@@ -16,6 +16,12 @@ enum VideoSources {
         return LiveVideoSource(ffmpeg: ffmpeg)
     }
 
+    /// The programs a build runs, inside the app. A missing one makes the build say so before it starts.
+    static var tools: DVDTools {
+        let bin = Bundle.main.resourceURL?.appending(path: "bin") ?? URL(fileURLWithPath: "/nonexistent")
+        return DVDTools(ffmpeg: ffmpeg ?? bin.appending(path: "ffmpeg"), dvdauthor: bin.appending(path: "dvdauthor"), spumux: bin.appending(path: "spumux"))
+    }
+
     /// ffmpeg inside the app, or the one RIPPLE_FFMPEG names while the tools are not yet carried (S-048).
     static var ffmpeg: URL? {
         let candidates = [Bundle.main.resourceURL?.appending(path: "bin/ffmpeg"),

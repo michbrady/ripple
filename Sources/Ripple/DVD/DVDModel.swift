@@ -29,7 +29,23 @@ final class DVDModel: StoppableJob {
     /// Edit > Undo for removing, moving, and renaming.
     var undoManager: UndoManager?
 
+    enum Phase {
+        case editing
+        case building(DVDBuildStage, Double)
+        case ready(DVDBuildResult)
+        case failed(String)
+    }
+
+    private(set) var phase: Phase = .editing
+    private(set) var buildStarted: Date?
+
     @ObservationIgnored private let source: any VideoSource
+    @ObservationIgnored private var buildTask: Task<Void, Never>?
+    /// How a build is made: the real programs, or a stand-in for snapshots and the self-test.
+    @ObservationIgnored var makeMaker: (DVDProject, URL) -> any DVDMaker = { project, work in
+        if Store.isOverridden { return FixtureDVDMaker(project: project, work: work) }
+        return DVDBuilder(tools: VideoSources.tools, project: project, work: work)
+    }
 
     init(source: any VideoSource = VideoSources.make()) {
         self.source = source
@@ -88,13 +104,74 @@ final class DVDModel: StoppableJob {
         DVDPlan(files: videos, standard: standard, capacityBlocks: DVDPlan.capacity(for: state))
     }
 
-    var isBusy: Bool { false }
+    var isBuilding: Bool { if case .building = phase { true } else { false } }
+
+    var isBusy: Bool { isBuilding }
 
     var stopPrompt: (title: String, detail: String, stop: String, keep: String) {
-        ("Stop Making the Disc?", "The disc is not finished. If you quit now, the work so far is lost.", "Quit", "Keep Working")
+        ("Stop Making the Disc?", "The disc is not finished. If you quit now, the work so far is lost.", "Stop and Quit", "Keep Working")
     }
 
-    func stop() async {}
+    func stop() async {
+        buildTask?.cancel()
+        await buildTask?.value
+    }
+
+    // MARK: Build
+
+    /// Everything the builder needs, from the list and the choices.
+    func project(on state: BurnDeviceState) -> DVDProject {
+        DVDProject(files: videos, discName: cleanDiscName, standard: standard, widescreen: widescreen, look: look,
+                   background: backgroundURL, music: musicURL, capacityBlocks: DVDPlan.capacity(for: state))
+    }
+
+    func canBuild(on state: BurnDeviceState) -> Bool {
+        guard case .editing = phase, !videos.isEmpty, !tooMany, !items.contains(where: { if case .reading = $0.state { true } else { false } }) else { return false }
+        return plan(on: state).fit == .fits
+    }
+
+    /// Converts the videos, draws the menu, and makes the disc image, with a bar and Cancel.
+    func build(on state: BurnDeviceState) {
+        guard canBuild(on: state) else { return }
+        let work = FileManager.default.temporaryDirectory.appending(path: "ripple-dvd-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let maker = makeMaker(project(on: state), work)
+        buildStarted = .now
+        phase = .building(.checking, 0)
+        buildTask = Task { [weak self] in
+            do {
+                let result = try await maker.build { stage, fraction in
+                    DispatchQueue.main.async { MainActor.assumeIsolated { self?.report(stage, fraction) } }
+                }
+                self?.phase = .ready(result)
+            } catch {
+                // A cancel goes back to the list with nothing lost; the builder has already removed its files.
+                self?.phase = (error is CancellationError || Task.isCancelled) ? .editing : .failed(error.localizedDescription)
+            }
+            self?.buildTask = nil
+        }
+    }
+
+    private func report(_ stage: DVDBuildStage, _ fraction: Double) {
+        guard isBuilding else { return }   // a late report must not undo a finished or cancelled build
+        phase = .building(stage, fraction)
+    }
+
+    func cancelBuild() { buildTask?.cancel() }
+
+    /// Back to the list, from a failure or a finished disc. Removes what the build made.
+    func startOver() {
+        if case .ready(let result) = phase { try? FileManager.default.removeItem(at: result.work) }
+        phase = .editing
+    }
+
+    /// "About 25 minutes left", once there is enough progress to guess.
+    func timeLeftText(now: Date = .now) -> String? {
+        guard case .building(_, let fraction) = phase, let start = buildStarted, fraction > 0.02 else { return nil }
+        let elapsed = now.timeIntervalSince(start)
+        guard elapsed >= 60 else { return nil }
+        let minutes = Int((elapsed * (1 - fraction) / fraction / 60).rounded(.up))
+        return minutes <= 1 ? "About a minute left" : "About \(minutes) minutes left"
+    }
 
     // MARK: Files
 
@@ -276,9 +353,11 @@ final class DVDModel: StoppableJob {
     func showSnapshot(_ page: BurnSnapshotPage) {
         skipped = 0
         items = []
+        phase = .editing
+        buildStarted = nil
         showsMenu = page == .videoMenu || page == .videoMenuDaylight
         look = page == .videoMenuDaylight ? .daylight : .classic
-        guard page == .videoList || page == .videoOver || page == .videoMenu || page == .videoMenuDaylight else { return }
+        guard page == .videoList || page == .videoOver || page == .videoMenu || page == .videoMenuDaylight || page == .videoBuilding || page == .videoFailed else { return }
         func video(_ name: String, _ seconds: Double) -> DVDItem {
             let url = URL(fileURLWithPath: "/Movies/\(name).mp4")
             let file = VideoFile(url: url, title: VideoProbe.defaultTitle(for: url), bytes: Int(seconds * 450_000), seconds: seconds,
@@ -286,6 +365,13 @@ final class DVDModel: StoppableJob {
             return DVDItem(url: url, state: .ready(file), picture: FixtureVideoSource.gradient(seed: abs(name.hashValue)))
         }
         items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142)]
+        if page == .videoBuilding || page == .videoFailed {
+            items = Array(items.prefix(4))
+            let name = items.count > 1 ? (title(of: items[1].id) ?? "Birthday Party") : "Birthday Party"
+            phase = page == .videoBuilding ? .building(.converting(title: 2, of: 4, name: name, fraction: 0.4), 0.38)
+                                           : .failed(DVDBuildError.failed(step: "Converting \u{201C}\(name)\u{201D}", detail: "The video could not be decoded.").localizedDescription)
+            return
+        }
         if page == .videoMenu || page == .videoMenuDaylight {
             items = [video("Summer_Trip", 3_840), video("Birthday Party", 1_725), video("Beach Day", 905), video("First Steps", 142),
                      video("Wedding", 1_800), video("Honeymoon", 1_200), video("Graduation", 900)]

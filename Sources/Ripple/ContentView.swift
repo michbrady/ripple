@@ -32,7 +32,7 @@ struct ContentView: View {
                 }
                 .pickerStyle(.segmented)
                 .fixedSize()
-                .disabled(model.isBusy || burn.isBusy)
+                .disabled(model.isBusy || burn.isBusy || dvd.isBusy)
                 .help("Switch between ripping a disc and burning one")
             }
             ToolbarItem {
@@ -47,7 +47,7 @@ struct ContentView: View {
                 if model.mode == .burn {
                     Button("Eject", systemImage: "eject") { burn.eject() }
                         .help("Eject the disc (⌘E)")
-                        .disabled(burn.isBusy || burn.deviceState == .noDisc || burn.deviceState == .noDrive)
+                        .disabled(burn.isBusy || dvd.isBusy || burn.deviceState == .noDisc || burn.deviceState == .noDrive)
                 } else {
                     Button("Eject", systemImage: "eject") { model.eject() }
                         .help("Eject the disc (⌘E)")

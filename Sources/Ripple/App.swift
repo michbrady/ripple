@@ -44,9 +44,11 @@ struct RippleApp: App {
                 Button("Rip Checked Tracks") { model.mode = .rip; model.rip() }
                     .keyboardShortcut("r")
                     .disabled(model.mode == .burn || model.phase != .ready || model.checkedCount == 0)
-                Button("Burn Disc") { burn.burn() }
-                    .keyboardShortcut("b")
-                    .disabled(model.mode == .rip || !burn.canBurn)
+                Button(burn.type == .video ? "Build Disc" : "Burn Disc") {
+                    if burn.type == .video { dvd.build(on: burn.deviceState) } else { burn.burn() }
+                }
+                .keyboardShortcut("b")
+                .disabled(model.mode == .rip || (burn.type == .video ? !dvd.canBuild(on: burn.deviceState) : !burn.canBurn))
                 Button("Add Videos…") { dvd.chooseVideos() }
                     .keyboardShortcut("o")
                     .disabled(model.mode == .rip || burn.type != .video || burn.phase != .editing)

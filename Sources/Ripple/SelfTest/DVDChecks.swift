@@ -21,6 +21,7 @@ extension SelfTest {
         await standardChecks()
         menuChecks(dvd: dvd)
         await menuMediaChecks()
+        await buildChecks(burn: burn, dvd: dvd)
     }
 
     /// S-040: dropped files and folders become rows; other files are counted and skipped; bad videos say why.
@@ -205,5 +206,49 @@ extension SelfTest {
         u32(16); u16(1); u16(1); u32(rate); u32(rate * 2); u16(2); u16(16)
         data.append(contentsOf: Array("data".utf8)); u32(bytes); data.append(Data(count: bytes))
         return data
+    }
+
+    /// S-045: Build Disc runs every stage in order, and Cancel and failure go back to the list.
+    private static func buildChecks(burn: BurnModel, dvd: DVDModel) async {
+        let fm = FileManager.default
+        burn.showSnapshot(.videoEmpty)
+        dvd.showSnapshot(.videoList)
+        // The two rows that cannot be built (a protected video and one still reading) leave the build list as the four good videos.
+        dvd.remove(ids: Set(dvd.items.filter { if case .ready = $0.state { false } else { true } }.map(\.id)))
+        let state = burn.deviceState
+        check("a short list can be built", dvd.canBuild(on: state) && dvd.project(on: state).files.count == 4)
+        let project = dvd.project(on: state)
+        check("the project carries the choices", project.standard == .ntsc && project.widescreen && project.discName == dvd.cleanDiscName
+              && project.capacityBlocks == DVDPlan.capacity(for: state))
+
+        dvd.makeMaker = { project, work in FixtureDVDMaker(project: project, work: work, stepDelay: .milliseconds(2)) }
+        dvd.build(on: state)
+        check("Build Disc starts building", dvd.isBuilding && dvd.isBusy)
+        await wait(until: { if case .ready = dvd.phase { true } else { false } })
+        var image: URL?
+        if case .ready(let result) = dvd.phase { image = result.image }
+        check("a finished build holds the disc image", image.map { fm.fileExists(atPath: $0.path) } == true)
+        dvd.startOver()
+        check("Start Over removes the work folder", image.map { !fm.fileExists(atPath: $0.deletingLastPathComponent().path) } == true && !dvd.isBusy)
+
+        dvd.makeMaker = { project, work in FixtureDVDMaker(project: project, work: work, stepDelay: .milliseconds(300)) }
+        dvd.build(on: state)
+        await wait(until: { if case .building(.converting, _) = dvd.phase { true } else { false } })
+        dvd.cancelBuild()
+        await wait(until: { !dvd.isBuilding })
+        check("Cancel returns to the list with the videos kept", { if case .editing = dvd.phase { dvd.videos.count == 4 } else { false } }())
+
+        dvd.makeMaker = { project, work in FixtureDVDMaker(project: project, work: work, failAt: .authoring, stepDelay: .milliseconds(2)) }
+        dvd.build(on: state)
+        await wait(until: { if case .failed = dvd.phase { true } else { false } })
+        check("a failed build says which step did not work", { if case .failed(let text) = dvd.phase { text.contains("did not work") } else { false } }())
+        dvd.startOver()
+        check("Back to Videos keeps the list", dvd.videos.count == 4)
+
+        dvd.showSnapshot(.videoOver)
+        check("a list that is too long cannot be built", !dvd.canBuild(on: state))
+        dvd.makeMaker = { project, work in FixtureDVDMaker(project: project, work: work) }
+        burn.showSnapshot(.empty)
+        dvd.showSnapshot(.empty)
     }
 }

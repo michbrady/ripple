@@ -8,17 +8,34 @@ struct DVDView: View {
 
     var body: some View {
         @Bindable var dvd = dvd
-        VStack(spacing: 0) {
-            DiscTypeHeader()
-            Divider()
-            if dvd.items.isEmpty { DVDEmpty() } else { DVDList() }
-            Divider()
-            DVDBar()
+        Group {
+            switch dvd.phase {
+            case .editing:
+                VStack(spacing: 0) {
+                    DiscTypeHeader()
+                    Divider()
+                    if dvd.items.isEmpty { DVDEmpty() } else { DVDList() }
+                    Divider()
+                    DVDBar()
+                }
+                .inspector(isPresented: $dvd.showsMenu) {
+                    DVDMenuInspector().inspectorColumnWidth(min: 260, ideal: 320, max: 420)
+                }
+            case .building(let stage, let fraction):
+                DVDBuilding(stage: stage, fraction: fraction)
+            case .ready(let result):
+                DVDReady(result: result)
+            case .failed(let message):
+                ContentUnavailableView {
+                    Label("Unable to Build the Disc", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button("Back to Videos") { dvd.startOver() }.keyboardShortcut(.defaultAction)
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .inspector(isPresented: $dvd.showsMenu) {
-            DVDMenuInspector().inspectorColumnWidth(min: 260, ideal: 320, max: 420)
-        }
     }
 }
 
@@ -215,6 +232,10 @@ struct DVDBar: View {
                     .foregroundStyle(burn.isReady ? Color.secondary : Surface.warning)
                 Text(burn.deviceLine).lineLimit(2)
                 Spacer()
+                Button("Build Disc") { dvd.build(on: burn.deviceState) }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!dvd.canBuild(on: burn.deviceState))
+                    .help(dvd.canBuild(on: burn.deviceState) ? "Convert the videos and make the disc (⌘B)" : "Add videos that fit on the disc to build it")
             }
         }
         .padding(Space.lg)
@@ -277,5 +298,54 @@ struct DVDBar: View {
         let used = DVDPlan.approximateText(plan.totalSeconds), room = DVDPlan.approximateText(plan.longestReducedSeconds)
         if case .tooLong = plan.fit { return "\(used) of \(room)" }
         return "\(used) of \(room) \u{00B7} \(plan.quality.title)"
+    }
+}
+
+/// The build is running: what it is doing, one bar, and Cancel.
+struct DVDBuilding: View {
+    @Environment(DVDModel.self) private var dvd
+    let stage: DVDBuildStage
+    let fraction: Double
+
+    var body: some View {
+        VStack(spacing: Space.lg) {
+            Text("Building the Disc").font(.title2.bold())
+            Text(stageText).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            ProgressView(value: fraction).frame(width: 320)
+            if let left = dvd.timeLeftText() { Text(left).font(.callout).foregroundStyle(.secondary) }
+            Button("Cancel") { dvd.cancelBuild() }.keyboardShortcut(.cancelAction)
+                .help("Stop building the disc (Esc)")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue("\(Int((fraction * 100).rounded())) percent")
+    }
+
+    private var stageText: String {
+        switch stage {
+        case .checking: "Checking the videos\u{2026}"
+        case .pictures: "Making pictures for the menu\u{2026}"
+        case .menus: "Drawing the menu\u{2026}"
+        case .converting(let title, let of, let name, _): "Converting \u{201C}\(name)\u{201D} (\(title) of \(of))\u{2026}"
+        case .authoring: "Writing the disc files\u{2026}"
+        case .imaging: "Making the disc image\u{2026}"
+        case .done: "Finishing\u{2026}"
+        }
+    }
+}
+
+/// The disc is made. Saving the image and burning come next (S-046, S-047).
+struct DVDReady: View {
+    @Environment(DVDModel.self) private var dvd
+    let result: DVDBuildResult
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("Disc Ready", systemImage: "checkmark.circle")
+        } description: {
+            Text("Your Video DVD is ready: \(result.titles) \(result.titles == 1 ? "video" : "videos").")
+        } actions: {
+            Button("Start Over") { dvd.startOver() }
+        }
     }
 }
