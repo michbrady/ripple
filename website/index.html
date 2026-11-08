@@ -165,14 +165,14 @@
 <main id="top">
   <div class="wrap">
     <div class="hero">
-      <span class="eyebrow">A BradysBit app &middot; Version 0.2</span>
+      <span class="eyebrow">A BradysBit app &middot; Version 0.3</span>
       <h1>Rip your CDs. Burn discs that play anywhere.</h1>
       <p class="lead">Put in a disc. Ripple copies the tracks to MP3 or M4A files on your Mac, finds the album, the song titles, and the cover, and names every file after its song. Then burn your MP3s to a regular music CD that plays in any standard CD player, car stereo, or old boom box. Or turn your videos into a Video DVD with a menu that plays in any DVD player.</p>
       <div class="actions">
         <a class="btn primary" href="Ripple.dmg" download>Download for Mac</a>
         <a class="btn" href="#how">See how it works</a>
       </div>
-      <p class="note">Free &middot; Version 0.2 &middot; 33.0 MB &middot; macOS 26 or later, Apple silicon &middot; <a href="#install">How to install it</a></p>
+      <p class="note">Free &middot; Version 0.3 &middot; 34.0 MB &middot; macOS 26 or later, Apple silicon &middot; <a href="#install">How to install it</a></p>
 
       <figure class="shot">
         <picture>
@@ -191,7 +191,7 @@
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))">
         <div class="card"><h3>Rip a CD</h3><p><b>In:</b> any audio CD.<br><b>Out:</b> MP3 files (variable or fixed quality, up to 320 kbps) or M4A files (AAC), named by song and filled with the album details and cover.</p></div>
         <div class="card"><h3>Burn a CD</h3><p><b>In:</b> a folder of MP3 or M4A files.<br><b>Out:</b> a regular music CD (the standard audio CD format) that plays in any standard CD player, or an MP3 Disc, with folders if you like, for players that read MP3 files.</p></div>
-        <div class="card"><h3>Burn a Video DVD</h3><p><b>In:</b> video files: MOV, MP4, M4V, AVI, MKV, WMV, MPG, WebM, and FLV.<br><b>Out:</b> a standard DVD-Video disc with a menu Ripple draws for you. It plays in any DVD player.</p></div>
+        <div class="card"><h3>Burn a Video DVD or Blu-ray</h3><p><b>In:</b> video files: MOV, MP4, M4V, AVI, MKV, WMV, MPG, WebM, and FLV.<br><b>Out:</b> a standard DVD-Video disc with a menu Ripple draws for you. It plays in any DVD player. Or choose Blu-ray Disc for a high-definition disc that plays at once, with no menu, in any Blu-ray player.</p></div>
       </div>
     </div>
   </section>
@@ -271,10 +271,10 @@
   <section id="install">
     <div class="wrap">
       <h2>Download</h2>
-      <p class="sub">Ripple 0.2 is free. It is an early version.</p>
+      <p class="sub">Ripple 0.3 is free. It is an early version.</p>
       <div class="actions" style="justify-content:flex-start;margin-bottom:1.5rem">
         <a class="btn primary" href="Ripple.dmg" download>Download Ripple for Mac</a>
-        <span class="note" style="margin:0;align-self:center">Ripple.dmg &middot; 33.0 MB</span>
+        <span class="note" style="margin:0;align-self:center">Ripple.dmg &middot; 34.0 MB</span>
       </div>
       <ol class="steps">
         <li><h3>Open the download</h3><p>Double-click <code>Ripple.dmg</code>. A window opens with Ripple and your Applications folder.</p></li>
@@ -288,7 +288,7 @@
       <div class="notice"><p><b>The first time you open Ripple, macOS asks you to confirm.</b></p><p>It says that Ripple was downloaded from the internet and asks if you want to open it. It also tells you that Apple checked it for malicious software and found none. That is normal for any app you download. Choose <b>Open</b>. It only asks once.</p></div>
       <div class="notice">
         <p><b>Check your download.</b> In Terminal, run <code>shasum -a 256 Ripple.dmg</code>. The result should be:</p>
-        <p class="sha">d2305130ce30f0f56ee4e9763d321c62e4a31f4872ff91e815eb84d4b73474b4</p>
+        <p class="sha">78edf6d8e1080a1529cacecdbcbbb3a03a327c031db9befe2853d41bc15edfa7</p>
       </div>
       <div class="notice">
         <p><b>If you like Ripple, pass a tip my way.</b></p>
@@ -306,7 +306,7 @@
         <li><b>Ripping</b> has been tried on real music CDs with one USB drive, including a disc with a data session. The audio matched the Mac&rsquo;s own copy exactly.</li>
         <li><b>Burning takes MP3 and M4A files.</b> Other kinds of audio files are not accepted for burning yet. On an MP3 Disc, M4A files are converted to MP3 (192 kbps), so they lose a little quality.</li>
         <li><b>Burning an MP3 Disc</b> has been tried on a real disc and checked file by file. <b>Burning an Audio CD</b> has not been tried on a real CD-R yet.</li>
-        <li><b>Video DVDs</b> are new. The menu, the conversion, and the disc image are tested on this Mac, but a Video DVD has <b>not been tried on a real blank disc or in a DVD player yet</b>. Converting is slow: a two-hour movie takes roughly 20 to 40 minutes on an Apple silicon Mac. Ripple cannot read copy-protected video and does not try to get around it. Version one leaves out subtitles, extra audio tracks, moving menus, and Blu-ray.</li>
+        <li><b>Video DVDs</b> are new. The menu, the conversion, and the disc image are tested on this Mac, but a Video DVD has <b>not been tried on a real blank disc or in a DVD player yet</b>. Converting is slow: a two-hour movie takes roughly 20 to 40 minutes on an Apple silicon Mac. Ripple cannot read copy-protected video and does not try to get around it. Blu-ray Discs have no menu: the disc plays everything in order, with a chapter for each video, and each video is also a title that players with a title list can pick. A Blu-ray has <b>not been tried on a real blank disc or in a Blu-ray player yet either</b>. Subtitles, extra audio tracks, and moving menus are left out.</li>
         <li><b>Check for errors</b> catches reads that fail or disagree. It cannot catch a drive that repeats the same wrong data twice. Stronger checking is planned.</li>
         <li><b>Signed and notarized.</b> Apple has checked this download for known malicious software.</li>
         <li>Rip only music you own or have the right to copy.</li>
@@ -321,6 +321,7 @@
       <dl>
         <dt><a href="https://ffmpeg.org/">FFmpeg</a></dt><dd>Reads your videos and converts them for the disc. GNU General Public License, version 3 or later. A separate program inside Ripple.</dd>
         <dt><a href="https://dvdauthor.sourceforge.net/">dvdauthor and spumux</a></dt><dd>Write the DVD&rsquo;s files and lay the menu buttons over the menu. GNU General Public License, version 2 or later. Separate programs inside Ripple.</dd>
+        <dt><a href="https://github.com/justdan96/tsMuxer">tsMuxeR</a></dt><dd>Joins the videos into a Blu-ray disc image. Apache License 2.0. A separate program inside Ripple.</dd>
         <dt><a href="https://lame.sourceforge.io/">LAME</a></dt><dd>Makes the MP3 files. GNU Lesser General Public License. A separate library inside Ripple that you can replace.</dd>
         <dt><a href="https://musicbrainz.org/">MusicBrainz</a> and the <a href="https://coverartarchive.org/">Cover Art Archive</a></dt><dd>Find the album, the song titles, and the cover. The iTunes Search API is the fallback for covers.</dd>
       </dl>
@@ -333,7 +334,7 @@
       <h2>Requirements</h2>
       <dl>
         <dt>A Mac</dt><dd>With Apple silicon, running macOS 26 or later.</dd>
-        <dt>A disc drive</dt><dd>Most Macs have no disc drive. A USB CD or DVD drive works. Burning needs a drive that can write discs and a blank disc: a CD-R for a regular music CD, or a DVD-R or DVD-RW for a Video DVD.</dd>
+        <dt>A disc drive</dt><dd>Most Macs have no disc drive. A USB CD or DVD drive works. Burning needs a drive that can write discs and a blank disc: a CD-R for a regular music CD, a DVD-R or DVD-RW for a Video DVD, or a BD-R or BD-RE for a Blu-ray (which needs a Blu-ray burner).</dd>
         <dt>Space on your Mac</dt><dd>A Video DVD is made in a work folder first. Ripple needs about twice the disc&rsquo;s size, plus a little, free on your Mac while it works, and tells you before it starts if there is not enough.</dd>
         <dt>Internet</dt><dd>Only for the album and cover lookup. You can type the details yourself without it.</dd>
       </dl>
