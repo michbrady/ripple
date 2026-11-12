@@ -42,6 +42,11 @@ final class BurnModel: StoppableJob {
         didSet { defaults.set(type.rawValue, forKey: "burn.type") }
     }
 
+    /// How fast a video disc is written. A slower burn plays in more old players.
+    var speed: BurnSpeed = .x4 {
+        didSet { defaults.set(speed.rawValue, forKey: "burn.speed") }
+    }
+
     private let defaults: UserDefaults
     let burner: any DiscBurner
     private var burnTask: Task<Void, Never>?
@@ -53,6 +58,7 @@ final class BurnModel: StoppableJob {
         self.deviceState = burner.state()
         Self.current = self
         type = DiscType(rawValue: defaults.string(forKey: "burn.type") ?? "") ?? .audio
+        speed = BurnSpeed(rawValue: defaults.string(forKey: "burn.speed") ?? "") ?? .x4
         Jobs.register(self)
     }
 
@@ -112,8 +118,10 @@ final class BurnModel: StoppableJob {
 
     /// A heads-up that does not stop the burn: a CD-RW will not play in many older players.
     var compatibilityNote: String? {
-        guard type == .audio, case .ready(let media) = deviceState, media.label == "CD-RW" else { return nil }
-        return "Many older CD players cannot read CD-RW discs. A blank CD-R plays in more players."
+        guard case .ready(let media) = deviceState else { return nil }
+        if type == .audio, media.label == "CD-RW" { return "Many older CD players cannot read CD-RW discs. A blank CD-R plays in more players." }
+        if type == .video, media.label.hasPrefix("DVD+") { return "Many older DVD players cannot read \(media.label) discs. A blank DVD-R plays in more players." }
+        return nil
     }
 
     /// An MP3 Disc holds MP3 files, so M4A files on it are converted. Said before the burn, not after.
@@ -316,7 +324,7 @@ final class BurnModel: StoppableJob {
     func burnImage(_ image: URL, volumeName: String) {
         guard let size = try? image.resourceValues(forKeys: [.fileSizeKey]).fileSize, imageProblem(bytes: size) == nil else { return }
         if !type.isVideo { type = .video }
-        run(BurnJob(type: type, files: [image], volumeName: volumeName))
+        run(BurnJob(type: type, files: [image], volumeName: volumeName, speed: speed))
     }
 
     private func run(_ job: BurnJob) {

@@ -458,3 +458,18 @@ import Testing
         #expect(burner.jobs[0].files == [image])
     }
 }
+
+@Suite struct BurnSpeedTests {
+    @Test func speedsAreMultiplesOfEachDiscsOneTimesRate() {
+        #expect(BurnSpeed.x4.kilobytesPerSecond(for: .dvd) == 5_540)
+        #expect(BurnSpeed.x2.kilobytesPerSecond(for: .bluray) == 8_992)
+        #expect(BurnSpeed.maximum.kilobytesPerSecond(for: .dvd) == nil)
+        #expect(BurnSpeed.x4.kilobytesPerSecond(for: .other) == nil)
+        #expect(BurnSpeed.x4.title == "4x" && BurnSpeed.maximum.title == "Maximum")
+    }
+
+    @Test func aJobCarriesItsSpeed() {
+        #expect(BurnJob(type: .video, files: [], volumeName: "Trip", speed: .x2).speed == .x2)
+        #expect(BurnJob(type: .audio, files: [], volumeName: "Mix").speed == .maximum)
+    }
+}

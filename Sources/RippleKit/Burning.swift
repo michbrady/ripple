@@ -160,13 +160,38 @@ public struct BurnJob: Equatable, Sendable {
     public var placements: [String]
     /// For an MP3 Disc: every folder to make, empty ones too.
     public var folders: [String]
+    /// For a video disc: how fast to write it.
+    public var speed: BurnSpeed
 
-    public init(type: DiscType, files: [URL], volumeName: String, placements: [String] = [], folders: [String] = []) {
+    public init(type: DiscType, files: [URL], volumeName: String, placements: [String] = [], folders: [String] = [], speed: BurnSpeed = .maximum) {
+        self.speed = speed
         self.type = type
         self.files = files
         self.volumeName = volumeName
         self.placements = placements
         self.folders = folders
+    }
+}
+
+/// How fast a video disc is written. Old players read a slower burn more reliably.
+public enum BurnSpeed: String, CaseIterable, Identifiable, Sendable {
+    case maximum, x2, x4, x8
+
+    public var id: String { rawValue }
+    public var multiple: Int? { switch self { case .maximum: nil; case .x2: 2; case .x4: 4; case .x8: 8 } }
+    public var title: String { multiple.map { "\($0)x" } ?? "Maximum" }
+
+    /// Kilobytes a second on a disc of this kind (1x is 176.4 for CD, 1,385 for DVD, 4,496 for Blu-ray), or `nil` to let the drive pick its fastest.
+    public func kilobytesPerSecond(for kind: BurnMedia.Kind) -> Float? {
+        guard let multiple else { return nil }
+        let one: Float
+        switch kind {
+        case .cd: one = 176.4
+        case .dvd: one = 1_385
+        case .bluray: one = 4_496
+        case .other: return nil
+        }
+        return one * Float(multiple)
     }
 }
 

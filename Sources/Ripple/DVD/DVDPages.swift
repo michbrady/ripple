@@ -60,6 +60,12 @@ struct DVDReady: View {
             }
         } actions: {
             VStack(spacing: Space.md) {
+              @Bindable var burn = burn
+              Picker("Burn Speed", selection: $burn.speed) {
+                  ForEach(BurnSpeed.allCases) { Text($0.title).tag($0) }
+              }
+              .fixedSize()
+              .help("A slower burn plays in more older players. Maximum lets the drive choose its fastest")
               HStack {
                 Button("Burn Disc") { burn.burnImage(result.image, volumeName: dvd.cleanDiscName) }
                     .keyboardShortcut(.defaultAction)
@@ -75,6 +81,9 @@ struct DVDReady: View {
                 }
               }
               .fixedSize()
+              if let note = burn.compatibilityNote {
+                  Label(note, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(Surface.warning)
+              }
               if let problem {
                   Label(problem, systemImage: "exclamationmark.circle").font(.callout).foregroundStyle(Surface.warning)
               }

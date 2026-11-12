@@ -125,11 +125,14 @@ final class DiscRecordingBurner: DiscBurner, @unchecked Sendable {
             layout = imageLayout
         }
         guard let burn = DRBurn(device: device) else { throw BurnError.noDisc }
-        burn.setProperties([
+        var properties: [AnyHashable: Any] = [
             DRBurnCompletionActionKey: completion == .eject ? DRBurnCompletionActionEject : DRBurnCompletionActionMount,
             DRBurnVerifyDiscKey: true,
             DRBurnAppendableKey: false,
-        ])
+        ]
+        // Without this the drive writes as fast as it can.
+        if job.type.isVideo, let speed = job.speed.kilobytesPerSecond(for: job.type.mediaKind) { properties[DRBurnRequestedSpeedKey] = speed }
+        burn.setProperties(properties)
         burn.writeLayout(layout)
 
         // RIPPLE_BURN_DEBUG=1 logs every state the framework reports, to learn how a real burn proceeds.
