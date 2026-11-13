@@ -92,6 +92,15 @@ codesign --force "${flags[@]}" --sign "$identity" "$app/Contents/Frameworks/libm
 for inner in "$app"/Contents/Resources/lib/*.dylib "$app"/Contents/Resources/bin/*(N); do
   [[ -f "$inner" ]] && { codesign --force "${flags[@]}" --sign "$identity" "$inner" 2>&1 | grep -v "replacing existing signature" || true; }
 done
+# For a release, a file that did not get a Developer ID signature with a secure timestamp (the timestamp server was unreachable, say)
+# would be refused by Apple minutes later. Say so now. (The signing lines above hide codesign's chatter, and with it its errors.)
+if [[ "$identity" == Developer\ ID* ]]; then
+  for inner in "$app/Contents/Frameworks/libmp3lame.0.dylib" "$app"/Contents/Resources/lib/*.dylib "$app"/Contents/Resources/bin/*(N); do
+    # Read all of codesign's output first: `codesign | grep -q` can fail under pipefail when grep quits early.
+    details=$(codesign -dvv "$inner" 2>&1 || true)
+    [[ "$details" == *$'\nTimestamp='* ]] || { echo "build: $inner has no secure timestamp. Check the network (timestamp.apple.com) and run again." >&2; exit 1; }
+  done
+fi
 ents=()
 [[ -n "${ENTITLEMENTS:-}" ]] && ents=(--entitlements "$ENTITLEMENTS")   # see tools/fallback.entitlements
 codesign --force "${flags[@]}" "${ents[@]}" --sign "$identity" "$app" 2>&1 | grep -v "replacing existing signature" || true
