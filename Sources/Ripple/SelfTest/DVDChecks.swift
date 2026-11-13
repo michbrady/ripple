@@ -350,6 +350,13 @@ extension SelfTest {
         guard case .ready(let result) = dvd.phase else { return check("the real build finished", false, "\(dvd.phase)") }
         let size = (try? result.image.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         check("the real build made a disc image", size > 1_000_000 && result.titles == 2, "\(size) bytes, \(result.titles) titles")
+        let problems = (try? DVDImageOrder.addressingProblems(in: result.image)) ?? ["the image could not be read"]
+        check("every IFO file's addresses land on the files it points to (what a standalone player counts on)", problems.isEmpty, problems.joined(separator: "; "))
+        // RIPPLE_KEEP_DVD=<path>: keep a copy of the image, to look at it with other programs.
+        if let keep = ProcessInfo.processInfo.environment["RIPPLE_KEEP_DVD"] {
+            try? fm.removeItem(atPath: keep)
+            try? fm.copyItem(at: result.image, to: URL(fileURLWithPath: keep))
+        }
         let mount = folder.appending(path: "mount")
         try? fm.createDirectory(at: mount, withIntermediateDirectories: true)
         let attach = try? await ProcessRunner.run(URL(fileURLWithPath: "/usr/bin/hdiutil"), ["attach", "-readonly", "-nobrowse", "-mountpoint", mount.path, result.image.path])

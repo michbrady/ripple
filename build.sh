@@ -62,6 +62,13 @@ fi
 if [[ -d "$app/Contents/Resources/bin" ]]; then
   cp "$here/vendor/dvdtools/"* "$app/Contents/Resources/Licenses/"
 fi
+# A release carries every tool. A missing one would only show up when someone builds a disc, so stop here instead.
+if [[ "${SIGN_IDENTITY:-}" == Developer\ ID* || -n "${REQUIRE_TOOLS:-}" ]]; then
+  for tool in ffmpeg dvdauthor spumux tsMuxeR; do
+    [[ -x "$app/Contents/Resources/bin/$tool" ]] || { echo "build: $tool is not in the app. Run tools/fetch-ffmpeg.sh, tools/build-dvdauthor.sh and tools/fetch-tsmuxer.sh first." >&2; exit 1; }
+  done
+  ls "$app/Contents/Resources/lib/"*.dylib >/dev/null 2>&1 || { echo "build: the dvdauthor libraries are not in the app (tools/build-dvdauthor.sh)." >&2; exit 1; }
+fi
 # The build links a path on this Mac so `swift run` works; a finished app must not carry it.
 install_name_tool -delete_rpath "$here/.lame" "$app/Contents/MacOS/$name" 2>/dev/null || true
 sed -e "s/__BUILD__/$(date +%Y%m%d%H%M)/" "$here/Info.plist.in" > "$app/Contents/Info.plist"

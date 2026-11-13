@@ -211,6 +211,9 @@ public struct DVDBuilder: Sendable {
                                                                    "-udf-volume-name", label, "-default-volume-name", label, "-o", image.path, disc.path])
             guard made.status == 0, fm.fileExists(atPath: image.path) else { throw DVDBuildError.failed(step: "Making the disc image", detail: Self.tail(made.error + made.output)) }
             try? fm.removeItem(at: disc)
+            // hdiutil scatters the disc's files in an order of its own. A DVD player finds the video by counting sectors from each
+            // .IFO file, so the files must sit in DVD order. If the image is not what this expects it is kept as it is.
+            try? DVDImageOrder.reorder(image: image)
             report(.done)
             return DVDBuildResult(image: image, work: work, titles: specs.count)
         } catch {
